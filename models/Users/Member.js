@@ -1,0 +1,49 @@
+const mongoose = require("mongoose");
+
+const MemberSchema = new mongoose.Schema(
+  {
+    Member_id: { type: String, required: true, unique: true },
+    Name: { type: String, required: true },
+    mobileno: { type: String, required: true },
+    email: { type: String, required: true },
+    state: { type: String },
+    city: { type: String },
+    address: { type: String },
+    pincode: { type: String },
+    Father_name: { type: String },
+    gender: { type: String },
+    dob: { type: String },
+    password: { type: String, required: true },
+    Date_of_joining: { type: String },
+    spackage: { type: String },
+    package_value: { type: Number },
+    epin_no: { type: String },
+    amount: { type: Number },
+    mode_of_payment: { type: String },
+    Pan_no: { type: String },
+    Nominee_name: { type: String },
+    Nominee_age: { type: Number },
+    Nominee_Relation: { type: String },
+    status: { type: String, default: "active" },
+    node: { type: String },
+    transaction_pass: { type: String },
+    bdb_value: { type: String },
+    directreferal_value: { type: String },
+    bank_details: { type: String },
+    last_logged_in: { type: String },
+    google_pay: { type: String },
+    phonepe: { type: String },
+    member_code: { type: String },
+    roi_status: { type: String },
+    upgrade_package: { type: String },
+    upgrade_status: { type: String },
+    level_eligible: { type: String },
+    TBPDays: { type: String },
+    level_income: { type: String },
+    direct_income: { type: String },
+  },
+  { collection: "member_tbl" } 
+);
+
+const MemberModel = mongoose.model("Member", MemberSchema);
+module.exports = MemberModel;

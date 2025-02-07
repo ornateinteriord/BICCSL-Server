@@ -11,5 +11,5 @@ const AdminSchema = new mongoose.Schema(
   { collection: "admin_tbl" }
 );
 
-const AdminModel = mongoose.model("Admin", AdminSchema);
+const AdminModel = mongoose.model("admin_tbl", AdminSchema);
 module.exports = AdminModel;

@@ -45,5 +45,5 @@ const MemberSchema = new mongoose.Schema(
   { collection: "member_tbl" } 
 );
 
-const MemberModel = mongoose.model("Member", MemberSchema);
+const MemberModel = mongoose.model("member_tbl", MemberSchema);
 module.exports = MemberModel;

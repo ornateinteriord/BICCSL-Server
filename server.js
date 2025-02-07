@@ -16,6 +16,10 @@ app.use(cors());
 app.use('/auth', AuthRoutes)
 // app.use('/user')
 
+app.get('/', (req , res)=>{
+  res.send('Welcome to BICCSL Server')
+})
+
 //server
 const PORT = process.env.PORT || 5050;
 app.listen(PORT, () => {

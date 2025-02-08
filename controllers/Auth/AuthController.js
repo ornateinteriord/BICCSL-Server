@@ -27,6 +27,7 @@ const login = async (req, res) => {
     return res.status(200).json({
       success: true,
       role: userRole,
+      user:foundUser,
       message: `${
         userRole.charAt(0).toUpperCase() + userRole.slice(1).toLowerCase()
       } login successful`,

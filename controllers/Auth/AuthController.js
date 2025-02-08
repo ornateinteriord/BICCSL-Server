@@ -28,7 +28,7 @@ const login = async (req, res) => {
       success: true,
       role: userRole,
       message: `${
-        userRole.charAt(0).toUpperCase() + userRole.slice(1)
+        userRole.charAt(0).toUpperCase() + userRole.slice(1).toLowerCase()
       } login successful`,
     });
   } catch (error) {

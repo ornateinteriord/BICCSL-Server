@@ -7,29 +7,36 @@ const login = async (req, res) => {
     const { username, password } = req.body;
     const user = await MemberModel.findOne({ Member_id: username });
     const admin = await AdminModel.findOne({ username });
-    console.log(user)
-    console.log(admin)
     const foundUser = user || admin;
     if (!foundUser) {
-      return res.status(404).json({ success: false, message: "User or Admin not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User or Admin not found" });
     }
 
-      const userRole = user instanceof MemberModel ? "USER" : "ADMIN";
+    const userRole = user instanceof MemberModel ? "USER" : "ADMIN";
 
-      const isPasswordValid =  foundUser.PASSWORD || foundUser.password 
+    const isPasswordValid =
+      password === (foundUser.PASSWORD || foundUser.password);
     if (!isPasswordValid) {
-      return res.status(401).json({ success: false, message: "Incorrect username or password" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Incorrect username or password" });
     }
 
-    return res.status(200).json({ 
-        success: true, 
-        role: userRole, 
-        message: `${userRole.charAt(0).toUpperCase() + userRole.slice(1)} login successful` 
-      });
+    return res.status(200).json({
+      success: true,
+      role: userRole,
+      message: `${
+        userRole.charAt(0).toUpperCase() + userRole.slice(1)
+      } login successful`,
+    });
   } catch (error) {
     console.error("Login Error:", error);
-    return res.status(500).json({ success: false, message: "Internal server error" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 };
 
-module.exports = login
+module.exports = login;

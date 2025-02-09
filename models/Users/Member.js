@@ -41,6 +41,10 @@ const MemberSchema = new mongoose.Schema(
     TBPDays: { type: String },
     level_income: { type: String },
     direct_income: { type: String },
+    account_number : { type: String },
+    ifsc_code : { type: String },
+    bank_name : { type: String },
+    profile_image : { type: String },
   },
   { collection: "member_tbl" } 
 );

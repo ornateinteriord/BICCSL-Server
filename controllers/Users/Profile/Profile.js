@@ -1,5 +1,6 @@
 const bcrypt = require("bcrypt");
 const MemberModel = require("../../../models/Users/Member");
+const cloudinary = require('../../../config/cloudinaryConfig')
 
 const getMemberDetails = async (req, res) => {
   try {
@@ -23,13 +24,16 @@ const UpdateMemberDetails = async (req, res) => {
   try {
     const { memberId } = req.params;
     const { oldPassword, newPassword, ...updateData } = req.body;
-
+    
+    //find the member by ID 
     const member = await MemberModel.findOne({ Member_id: memberId });
     if (!member) {
       return res
         .status(404)
         .json({ success: false, message: "Member not found" });
     }
+
+    // Handle password update
     if (oldPassword && newPassword) {
       const isMatch = await bcrypt.compare(oldPassword, member.password);
       if (!isMatch) {
@@ -56,6 +60,14 @@ const UpdateMemberDetails = async (req, res) => {
       const hashedPassword = await bcrypt.hash(newPassword, 10);
       updateData.password = hashedPassword;
     }
+
+     // Handle profile image upload 
+      if(req.file){
+       const cloudinaryResult = await cloudinary.uploader.upload(req.file.buffer,{ folder: "profile_images"})
+       updateData.profile_image = cloudinaryResult.secure_url;
+      }
+      
+    // update member 
     const updatedMember = await MemberModel.findOneAndUpdate(
       { Member_id: memberId },
       { $set: updateData },

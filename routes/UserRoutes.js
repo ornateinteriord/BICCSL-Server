@@ -5,7 +5,7 @@ const {
 
 const router = require("express").Router();
 
-router.get("/member/:memberId", getMemberDetails);
-router.put("/member/:memberId", UpdateMemberDetails);
+router.get("/member/:id", getMemberDetails);
+router.put("/member/:id", UpdateMemberDetails);
 
 module.exports = router;

@@ -8,6 +8,6 @@ const router = require("express").Router();
 
 router.get("/member/:id", getMemberDetails);
 router.put("/member/:id", UpdateMemberDetails);
-router.get("/transactions",getTransactionDetails)
+router.get("/transactions/:id",getTransactionDetails)
 
 module.exports = router;

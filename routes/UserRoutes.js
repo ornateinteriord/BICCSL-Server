@@ -3,13 +3,11 @@ const {
   getMemberDetails,
   UpdateMemberDetails,
 } = require("../controllers/Users/Profile/Profile");
-const Authenticated = require("../middlewares/auth");
-
 
 const router = require("express").Router();
 
-router.get("/member/:id",Authenticated, getMemberDetails);
-router.put("/member/:id",Authenticated, UpdateMemberDetails);
-router.get("/transactions/:id",Authenticated,getTransactionDetails)
+router.get("/member/:id", getMemberDetails);
+router.put("/member/:id", UpdateMemberDetails);
+router.get("/transactions/:id",getTransactionDetails)
 
 module.exports = router;

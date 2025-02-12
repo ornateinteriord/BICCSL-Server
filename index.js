@@ -4,6 +4,7 @@ require("dotenv").config();
 require("./models/db");
 const AuthRoutes = require("./routes/AuthRoutes");
 const UserRoutes = require("./routes/UserRoutes");
+const AdminRoutes = require("./routes/AdminRoute")
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use(
 //router
 app.use("/auth", AuthRoutes);
 app.use("/user", UserRoutes);
+app.use("/admin",AdminRoutes);
 
 app.get("/", (req, res) => {
   res.send("Welcome to BICCSL Server");

@@ -27,7 +27,6 @@ const login = async (req, res) => {
         .json({ success: false, message: "Incorrect username or password" });
     }
 
-  
     const token = jwt.sign(
       { id: foundUser._id, role: userRole },
       process.env.JWT_SECRET,
@@ -42,8 +41,6 @@ const login = async (req, res) => {
         userRole.charAt(0).toUpperCase() + userRole.slice(1).toLowerCase()
       } login successful`,
     });
-   
-
   } catch (error) {
     console.error("Login Error:", error);
     return res

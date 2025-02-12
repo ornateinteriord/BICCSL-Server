@@ -5,11 +5,11 @@ const AdminModel = require("../../../models/Admin/Admin");
 
 const getMemberDetails = async (req, res) => {
   try {
-    const { id } = req.params;
+    const  id  = req.user.id;
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res
         .status(400)
-        .json({ success: false, message: "Invalid User ID" });
+        .json({ success: false, message: "Invalid User ID", });
     }
     const foundUser = await MemberModel.findById(id) || await AdminModel.findById(id);
                   
@@ -29,7 +29,7 @@ const getMemberDetails = async (req, res) => {
 
 const UpdateMemberDetails = async (req, res) => {
   try {
-    const { id } = req.params;
+    const  id  = req.user.id;
     const { oldPassword, newPassword, ...updateData } = req.body;
 
     //find the foundUser by ID

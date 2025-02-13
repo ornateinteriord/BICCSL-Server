@@ -17,7 +17,7 @@ const TransactionSchema = new mongoose.Schema(
     ew_debit: { type: String },
     status: { type: String },
   },
-  { collection: "transaction_tbl" }
+  { timestamps: true, collection: "transaction_tbl" }
 );
 
 const TransactionModel = mongoose.model("transaction_tbl", TransactionSchema);

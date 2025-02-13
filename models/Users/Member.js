@@ -46,7 +46,7 @@ const MemberSchema = new mongoose.Schema(
     bank_name : { type: String },
     profile_image : { type: String },
   },
-  { collection: "member_tbl" } 
+  { timestamps: true, collection: "member_tbl" } 
 );
 
 const MemberModel = mongoose.model("member_tbl", MemberSchema);

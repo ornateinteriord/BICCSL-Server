@@ -21,10 +21,8 @@ const getMemberDetails = async (req, res) => {
     }
     if(foundUser instanceof AdminModel){
       const members = await MemberModel.find().select("-password")
-      return res.status(200).json({success:true,data:members})
+      return res.status(200).json({success:true,data:foundUser,members})
     }
-    // const { password, ...memberData } = foundUser.toObject();
-
     return res.status(200).json({ success: true, data: foundUser });
   } catch (error) {
     console.error("Error fetching User details:", error);

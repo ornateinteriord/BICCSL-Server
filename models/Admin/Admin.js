@@ -8,7 +8,7 @@ const AdminSchema = new mongoose.Schema(
     role: { type: String, required: true },
     STATUS: { type: String, required: true },
   },
-  { collection: "admin_tbl" }
+  {timestamps: true, collection: "admin_tbl" }
 );
 
 const AdminModel = mongoose.model("admin_tbl", AdminSchema);

@@ -11,16 +11,21 @@ const getMemberDetails = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Invalid User ID", });
     }
-    const foundUser = await MemberModel.findById(id) || await AdminModel.findById(id);
+  
+    const foundUser = await MemberModel.findById(id).select("-password") || await AdminModel.findById(id).select("-password");
                   
     if (!foundUser) {
       return res
         .status(404)
-        .json({ success: false, message: "Member not found" });
+        .json({ success: false, message: "user not found" });
     }
-    const { password, ...memberData } = foundUser.toObject();
+    if(foundUser instanceof AdminModel){
+      const members = await MemberModel.find().select("-password")
+      return res.status(200).json({success:true,data:members})
+    }
+    // const { password, ...memberData } = foundUser.toObject();
 
-    return res.status(200).json({ success: true, data: memberData });
+    return res.status(200).json({ success: true, data: foundUser });
   } catch (error) {
     console.error("Error fetching User details:", error);
     return res.status(500).json({ success: false, message: "Server error" });

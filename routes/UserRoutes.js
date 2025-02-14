@@ -16,3 +16,4 @@ router.post("/ticket" ,Authenticated,createTicket)
 router.get("/ticket/:id" ,Authenticated,getTickets)
 
 module.exports = router;
+

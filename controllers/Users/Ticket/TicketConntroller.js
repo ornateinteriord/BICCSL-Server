@@ -1,11 +1,16 @@
 const Ticket = require("../../../models/Ticket/Ticket");
+const MemberModel = require("../../../models/Users/Member");
 
 const createTicket = async (req, res) => {
     try {
-        const userId = req.user.id;
+        const member = await MemberModel.findById(req.user.id).lean()
+        if (!member?.Member_id) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
         const ticket = new Ticket({
         ...req.body,
-        userId,
+        userId:req.user.id,
+        reference_id:member.Member_id
         });
         await ticket.save();
         res.status(201).json({success : true , message : "Ticket Created Successfully", ticket });

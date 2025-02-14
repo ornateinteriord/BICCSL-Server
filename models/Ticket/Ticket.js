@@ -12,8 +12,8 @@ const ticketSchema = new mongoose.Schema({
     ticket_date: { type: Date, default: Date.now },
     type_of_ticket: { type: String, },
     ticket_details: { type: String, },
-    isReplied: { type: Boolean, default: false },
-    reply: { type: String, },
+    reference_id:{type: String,},
+    reply_details: { type: String, },
     ticket_status: { type: String, default: "pending" },
     SUBJECT: { type: String, }
 }, { timestamps: true, collection: "ticket_tbl" });

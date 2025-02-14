@@ -13,7 +13,7 @@ const ticketSchema = new mongoose.Schema({
     type_of_ticket: { type: String, },
     ticket_details: { type: String, },
     reference_id:{type: String,},
-    reply_details: { type: String, },
+    reply_details: { type: String, default: null },
     ticket_status: { type: String, default: "pending" },
     SUBJECT: { type: String, }
 }, { timestamps: true, collection: "ticket_tbl" });

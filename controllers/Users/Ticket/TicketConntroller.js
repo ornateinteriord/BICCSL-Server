@@ -3,9 +3,11 @@ const Ticket = require("../../../models/Ticket/Ticket");
 const createTicket = async (req, res) => {
     try {
         const userId = req.user.id;
+        const memberId = req.user.memberId;
         const ticket = new Ticket({
         ...req.body,
         userId,
+        reference_id: memberId
         });
         await ticket.save();
         res.status(201).json({success : true , message : "Ticket Created Successfully", ticket });

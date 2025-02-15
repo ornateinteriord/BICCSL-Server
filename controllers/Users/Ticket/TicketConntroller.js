@@ -50,6 +50,7 @@ const editTicket = async (req, res) => {
     try {
         const id = req.params.id;
         const userId = req.user.id;
+        const { reply_details } = req.body;
 
         if (!userId) {
             return res.status(400).json({ success: false, message: "Invalid User" });
@@ -60,12 +61,23 @@ const editTicket = async (req, res) => {
             return res.status(404).json({ success: false, message: "Ticket Not Found" });
         }
 
-        Object.assign(ticket, req.body);
-        await ticket.save();
-        res.status(200).json({ success: true, message: "Ticket Updated Successfully", ticket });
+        const updateFields = { reply_details };
+
+        if (reply_details) {
+            updateFields.ticket_status = "answered";
+        }
+
+        const updatedTicket = await Ticket.findByIdAndUpdate(
+            id, 
+            { $set: updateFields },
+            { new: true } 
+        );
+
+        res.status(200).json({ success: true, message: "Ticket Updated Successfully", ticket: updatedTicket });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
-}
+};
+
 
 module.exports = { createTicket, getTickets, editTicket };

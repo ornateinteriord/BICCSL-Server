@@ -14,7 +14,7 @@ const ticketSchema = new mongoose.Schema({
     ticket_details: { type: String, },
     reference_id:{type: String,},
     reply_details: { type: String, default: null },
-    ticket_status: { type: String, default: "pending" },
+    ticket_status: { type: String, enum :["pending", "answered"] ,default: "pending" },
     SUBJECT: { type: String, }
 }, { timestamps: true, collection: "ticket_tbl" });
 

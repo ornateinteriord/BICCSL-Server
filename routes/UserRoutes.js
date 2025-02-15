@@ -1,4 +1,5 @@
 const getTransactionDetails = require("../controllers/Transaction/Transaction");
+const { getEpins } = require("../controllers/Users/Epin/epin");
 const {
   getMemberDetails,
   UpdateMemberDetails,
@@ -14,6 +15,7 @@ router.put("/member/:id",Authenticated, UpdateMemberDetails);
 router.get("/transactions/:id",Authenticated,getTransactionDetails)
 router.post("/ticket" ,Authenticated,createTicket)
 router.get("/ticket/:id" ,Authenticated,getTickets)
+router.get("/epin" ,Authenticated,getEpins)
 
 module.exports = router;
 

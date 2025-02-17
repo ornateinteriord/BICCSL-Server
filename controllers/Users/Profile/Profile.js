@@ -32,24 +32,42 @@ const getMemberDetails = async (req, res) => {
 
 const UpdateMemberDetails = async (req, res) => {
   try {
-    const  id  = req.user.id;
+    let memberId;
+
+    // Check if admin is updating (get memberId from params) or user is updating (get from req.user)
+    if (req.user.role === "ADMIN") {
+      memberId = req.params.memberId; // Admin updating another member
+    } else {
+      memberId = req.user.memberId; // Logged-in user updating their own details
+    }
+
+    if (!memberId) {
+      return res.status(400).json({
+        success: false,
+        message: "Member ID is required",
+      });
+    }
+
     const { oldPassword, newPassword, ...updateData } = req.body;
 
-    //find the foundUser by ID
-    const foundUser = await MemberModel.findById(id);
+    // Find the user by Member_id (not _id)
+    const foundUser = await MemberModel.findOne({ Member_id: memberId });
+
     if (!foundUser) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Member not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Member not found",
+      });
     }
 
     // Handle password update
     if (oldPassword && newPassword) {
       const isMatch = await bcrypt.compare(oldPassword, foundUser.password);
       if (!isMatch) {
-        return res
-          .status(401)
-          .json({ success: false, message: "Old password is incorrect" });
+        return res.status(401).json({
+          success: false,
+          message: "Old password is incorrect",
+        });
       }
       if (oldPassword === newPassword) {
         return res.status(400).json({
@@ -67,16 +85,18 @@ const UpdateMemberDetails = async (req, res) => {
       updateData.password = hashedPassword;
     }
 
-    // update foundUser
-    const updatedMember = await MemberModel.findByIdAndUpdate(
-      id,
+    // Update user details
+    const updatedMember = await MemberModel.findOneAndUpdate(
+      { Member_id: memberId },
       { $set: updateData },
       { new: true, runValidators: true }
     );
+
     if (!updatedMember) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Member not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Member not found",
+      });
     }
 
     return res.status(200).json({
@@ -85,8 +105,11 @@ const UpdateMemberDetails = async (req, res) => {
       data: updatedMember,
     });
   } catch (error) {
-    console.error("Error updating foundUser details:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+    console.error("Error updating member details:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 };
 

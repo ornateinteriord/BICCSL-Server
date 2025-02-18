@@ -14,5 +14,5 @@ router.put("/ticket/:id" ,Authenticated,authorizeRoles("ADMIN"), editTicket)
 router.get("/tickets" ,Authenticated,authorizeRoles("ADMIN"), getTickets)
 router.get("/epin-summary" ,Authenticated,authorizeRoles("ADMIN"), getEpinsSummary)
 router.put('/update-member/:memberId',Authenticated,authorizeRoles("ADMIN"),UpdateMemberDetails)
-router.get('/update-member/:memberId',Authenticated,authorizeRoles("ADMIN"),getMember)
+router.get('/get-member/:memberId',Authenticated,authorizeRoles("ADMIN"),getMember)
 module.exports = router;

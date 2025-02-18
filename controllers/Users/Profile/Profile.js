@@ -44,7 +44,7 @@ const getMember = async(req,res)=>{
       .status(404)
       .json({ success: false, message: "Member not found", });
     }
-    res.status(200).json(member)
+    return res.status(200).json({ success: true, member });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
   }

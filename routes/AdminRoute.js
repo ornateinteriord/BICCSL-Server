@@ -1,6 +1,6 @@
 const getTransactionDetails = require("../controllers/Transaction/Transaction");
 const { getEpinsSummary } = require("../controllers/Users/Epin/epin");
-const { getMemberDetails, UpdateMemberDetails } = require("../controllers/Users/Profile/Profile");
+const { getMemberDetails, UpdateMemberDetails, getMember } = require("../controllers/Users/Profile/Profile");
 const { editTicket, getTickets } = require("../controllers/Users/Ticket/TicketConntroller");
 const Authenticated = require("../middlewares/auth");
 const authorizeRoles = require("../middlewares/authorizeRole");
@@ -14,4 +14,5 @@ router.put("/ticket/:id" ,Authenticated,authorizeRoles("ADMIN"), editTicket)
 router.get("/tickets" ,Authenticated,authorizeRoles("ADMIN"), getTickets)
 router.get("/epin-summary" ,Authenticated,authorizeRoles("ADMIN"), getEpinsSummary)
 router.put('/update-member/:memberId',Authenticated,authorizeRoles("ADMIN"),UpdateMemberDetails)
+router.get('/update-member/:memberId',Authenticated,authorizeRoles("ADMIN"),getMember)
 module.exports = router;

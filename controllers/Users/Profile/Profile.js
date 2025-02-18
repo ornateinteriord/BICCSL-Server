@@ -29,6 +29,26 @@ const getMemberDetails = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
+ 
+const getMember = async(req,res)=>{
+  try {
+    if(req.user.role !== "ADMIN"){
+      return res
+      .status(403)
+      .json({ success: false, message: "Access Denied", });
+    }
+    const memberId = req.params.memberId
+    const member = await MemberModel.findOne({Member_id:memberId})
+    if(!member){
+      return res
+      .status(404)
+      .json({ success: false, message: "Member not found", });
+    }
+    res.status(200).json(member)
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+}
 
 const UpdateMemberDetails = async (req, res) => {
   try {
@@ -113,4 +133,4 @@ const UpdateMemberDetails = async (req, res) => {
   }
 };
 
-module.exports = { getMemberDetails, UpdateMemberDetails };
+module.exports = { getMemberDetails, UpdateMemberDetails,getMember };

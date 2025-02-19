@@ -1,4 +1,3 @@
-const bcrypt = require("bcrypt");
 const MemberModel = require("../../../models/Users/Member");
 const mongoose = require("mongoose");
 const AdminModel = require("../../../models/Admin/Admin");

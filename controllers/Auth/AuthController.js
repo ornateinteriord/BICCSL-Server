@@ -1,4 +1,3 @@
-const bcrypt = require("bcrypt");
 const AdminModel = require("../../models/Admin/Admin");
 const MemberModel = require("../../models/Users/Member");
 const jwt = require("jsonwebtoken");
@@ -17,10 +16,7 @@ const login = async (req, res) => {
 
     const userRole = user instanceof MemberModel ? "USER" : "ADMIN";
 
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      foundUser.PASSWORD || foundUser.password
-    );
+    const isPasswordValid =  password===(foundUser.PASSWORD || foundUser.password);
     if (!isPasswordValid) {
       return res
         .status(401)

@@ -1,4 +1,3 @@
-const bcrypt = require("bcrypt");
 const MemberModel = require("../../../models/Users/Member");
 const mongoose = require("mongoose");
 const AdminModel = require("../../../models/Admin/Admin");
@@ -12,7 +11,7 @@ const getMemberDetails = async (req, res) => {
         .json({ success: false, message: "Invalid User ID", });
     }
   
-    const foundUser = await MemberModel.findById(id).select("-password") || await AdminModel.findById(id).select("-password");
+    const foundUser = await MemberModel.findById(id)|| await AdminModel.findById(id);
                   
     if (!foundUser) {
       return res
@@ -20,7 +19,7 @@ const getMemberDetails = async (req, res) => {
         .json({ success: false, message: "user not found" });
     }
     if(foundUser instanceof AdminModel){
-      const members = await MemberModel.find().select("-password")
+      const members = await MemberModel.find()
       return res.status(200).json({success:true,data:foundUser,members})
     }
     return res.status(200).json({ success: true, data: foundUser });
@@ -54,11 +53,10 @@ const UpdateMemberDetails = async (req, res) => {
   try {
     let memberId;
 
-    // Check if admin is updating (get memberId from params) or user is updating (get from req.user)
     if (req.user.role === "ADMIN") {
-      memberId = req.params.memberId; // Admin updating another member
+      memberId = req.params.memberId; 
     } else {
-      memberId = req.user.memberId; // Logged-in user updating their own details
+      memberId = req.user.memberId; 
     }
 
     if (!memberId) {
@@ -82,8 +80,7 @@ const UpdateMemberDetails = async (req, res) => {
 
     // Handle password update
     if (oldPassword && newPassword) {
-      const isMatch = await bcrypt.compare(oldPassword, foundUser.password);
-      if (!isMatch) {
+      if (oldPassword !== foundUser.password) {
         return res.status(401).json({
           success: false,
           message: "Old password is incorrect",
@@ -101,8 +98,8 @@ const UpdateMemberDetails = async (req, res) => {
           message: "Password must be at least 6 characters long",
         });
       }
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-      updateData.password = hashedPassword;
+     
+      updateData.password = newPassword;
     }
 
     // Update user details

@@ -1,3 +1,4 @@
+const { getNews, addNews } = require("../controllers/Admin/news/NewsController");
 const getTransactionDetails = require("../controllers/Transaction/Transaction");
 const { getEpinsSummary } = require("../controllers/Users/Epin/epin");
 const { getMemberDetails, UpdateMemberDetails, getMember } = require("../controllers/Users/Profile/Profile");
@@ -15,4 +16,6 @@ router.get("/tickets" ,Authenticated,authorizeRoles("ADMIN"), getTickets)
 router.get("/epin-summary" ,Authenticated,authorizeRoles("ADMIN"), getEpinsSummary)
 router.put('/update-member/:memberId',Authenticated,authorizeRoles("ADMIN"),UpdateMemberDetails)
 router.get('/get-member/:memberId',Authenticated,authorizeRoles("ADMIN"),getMember)
+router.get('/getnews',Authenticated,authorizeRoles("ADMIN"),getNews)
+router.post('/addnews',Authenticated,authorizeRoles("ADMIN"),addNews)
 module.exports = router;

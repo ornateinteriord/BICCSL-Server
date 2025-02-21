@@ -1,4 +1,4 @@
-const { getNews, addNews } = require("../controllers/Admin/news/NewsController");
+const { getNews, addNews } = require("../controllers/Admin/News/NewsController");
 const getTransactionDetails = require("../controllers/Transaction/Transaction");
 const { getEpinsSummary } = require("../controllers/Users/Epin/epin");
 const { getMemberDetails, UpdateMemberDetails, getMember } = require("../controllers/Users/Profile/Profile");

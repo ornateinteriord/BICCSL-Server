@@ -1,3 +1,4 @@
+const { getHoliday, addHoliday } = require("../controllers/Admin/Holiday/HolidayController");
 const { getNews, addNews } = require("../controllers/Admin/news/NewsController");
 const getTransactionDetails = require("../controllers/Transaction/Transaction");
 const { getEpinsSummary } = require("../controllers/Users/Epin/epin");
@@ -18,4 +19,7 @@ router.put('/update-member/:memberId',Authenticated,authorizeRoles("ADMIN"),Upda
 router.get('/get-member/:memberId',Authenticated,authorizeRoles("ADMIN"),getMember)
 router.get('/getnews',Authenticated,authorizeRoles("ADMIN"),getNews)
 router.post('/addnews',Authenticated,authorizeRoles("ADMIN"),addNews)
+router.get('/getholiday',Authenticated,authorizeRoles("ADMIN"),getHoliday)
+router.post('/addholiday',Authenticated,authorizeRoles("ADMIN"),addHoliday)
+
 module.exports = router;

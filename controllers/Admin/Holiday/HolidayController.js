@@ -1,21 +1,7 @@
-const mongoose = require("mongoose");
 const HolidayModel = require("../../../models/Holiday/Holiday");
-const AdminModel = require("../../../models/Admin/Admin");
 
 const getHoliday = async (req, res) => {
   try {
-    const id = req.user.id;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid User ID" });
-    }
-    const Admin = await AdminModel.findById(id);
-    if (!Admin) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Admin not found" });
-    }
     const HolidayData = await HolidayModel.find();
     return res.status(200).json({ success: true, holiday: HolidayData });
   } catch (error) {

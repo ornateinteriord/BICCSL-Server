@@ -36,7 +36,10 @@ const addHoliday = async (req, res) => {
         message: "Holiday added successfully",
         holiday: newHoliday,
       });
-  } catch (error) {}
+  } catch (error) {
+    console.error("Error fetching User details:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
 };
 
 module.exports = { getHoliday, addHoliday };

@@ -6,7 +6,7 @@ const getHoliday = async (req, res) => {
     return res.status(200).json({ success: true, holiday: HolidayData });
   } catch (error) {
     console.error("Error fetching User details:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+    return res.status(500).json({ success: false, message: error });
   }
 };
 
@@ -37,8 +37,8 @@ const addHoliday = async (req, res) => {
         holiday: newHoliday,
       });
   } catch (error) {
-    console.error("Error fetching User details:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+    console.error("Error", error);
+    return res.status(500).json({ success: false, message:error });
   }
 };
 

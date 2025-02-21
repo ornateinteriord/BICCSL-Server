@@ -1,5 +1,4 @@
 const { getHoliday, addHoliday } = require("../controllers/Admin/Holiday/HolidayController");
-const { getNews, addNews } = require("../controllers/Admin/news/NewsController");
 const { getNews, addNews } = require("../controllers/Admin/News/NewsController");
 const getTransactionDetails = require("../controllers/Transaction/Transaction");
 const { getEpinsSummary } = require("../controllers/Users/Epin/epin");

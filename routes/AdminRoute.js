@@ -1,6 +1,5 @@
 const { getHoliday, addHoliday } = require("../controllers/Admin/Holiday/HolidayController");
 const { getNews, addNews } = require("../controllers/Admin/News/NewsController");
-const UpdatePassword = require("../controllers/Admin/UpdatePassword");
 const getTransactionDetails = require("../controllers/Transaction/Transaction");
 const { getEpinsSummary } = require("../controllers/Users/Epin/epin");
 const { getMemberDetails, UpdateMemberDetails, getMember } = require("../controllers/Users/Profile/Profile");
@@ -10,7 +9,7 @@ const authorizeRoles = require("../middlewares/authorizeRole");
 
 const router = require("express").Router();
 
-router.put("/update-password",Authenticated,authorizeRoles("ADMIN"),UpdatePassword)
+
 router.get("/members",Authenticated,authorizeRoles("ADMIN"),getMemberDetails)
 router.get("/transactions",Authenticated,authorizeRoles("ADMIN"),getTransactionDetails)
 router.put("/ticket/:id" ,Authenticated,authorizeRoles("ADMIN"), editTicket)

@@ -24,10 +24,10 @@ const UpdatePassword = async (req, res) => {
         .json({ message: "New password cannot be the same as old password" });
     }
     await AdminModel.findByIdAndUpdate(req.user.id, { PASSWORD: newPassword });
-    res.status(200).json({ message: "Password updated successfully" });
+    res.status(200).json({success: true, message: "Password updated successfully" });
   } catch (error) {
     console.error("Update Password Error:", error);
-    res.status(500).json({ message: error });
+    res.status(500).json({success: false, message: error });
   }
 };
 

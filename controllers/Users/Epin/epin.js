@@ -32,12 +32,17 @@ const getEpinsSummary = async (req, res) => {
             { $group: { _id: "$purchasedby", count: { $sum: 1 } } },
             { $project: { memberCode: "$_id", usedQuantity: "$count", status: "used", _id: 0 } }
         ]);
+        const totalEpins = await EpinModel.aggregate([
+            { $group: { _id: "$purchasedby", count: { $sum: 1 } } },
+            { $project: { memberCode: "$_id", totalQuantity: "$count", _id: 0 } }
+        ]);
 
         res.status(200).json({
             success: true,
             data: {
                 activeEpins,
-                usedEpins
+                usedEpins,
+                totalEpins
             }
         });
     } catch (error) {

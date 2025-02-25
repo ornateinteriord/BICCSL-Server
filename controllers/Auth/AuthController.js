@@ -1,6 +1,7 @@
 const AdminModel = require("../../models/Admin/Admin");
 const MemberModel = require("../../models/Users/Member");
 const jwt = require("jsonwebtoken");
+const sendSignupEmail = require("../../utils/EmailService");
 
 const generateUniqueMemberId = async () => {
   while (true) {
@@ -13,7 +14,7 @@ const generateUniqueMemberId = async () => {
 
 const signup = async (req, res) => {
   try {
-    const {  email, ...otherDetails } =
+    const {  email,password, ...otherDetails } =
       req.body;
     const existingUser = await MemberModel.findOne({ email });
     if (existingUser) {
@@ -27,14 +28,17 @@ const signup = async (req, res) => {
     const newMember = new MemberModel({
       Member_id: memberId,
       email,
+      password,
       ...otherDetails
     });
     await newMember.save();
+   
     res.status(201).json({
       success: true,
-      message: "Signup successful",
+      message: "Signup successful. Credentials sent to email.",
       user: newMember,
     });
+    await sendSignupEmail(email, memberId, password);
   } catch (error) {
     console.error("Signup Error:", error);
     res.status(500).json({ success: false, message: error });

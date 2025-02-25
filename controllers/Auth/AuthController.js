@@ -13,7 +13,7 @@ const generateUniqueMemberId = async () => {
 
 const signup = async (req, res) => {
   try {
-    const { Name, mobileno, email, password, Sponsor_code, Sponsor_name } =
+    const {  email, ...otherDetails } =
       req.body;
     const existingUser = await MemberModel.findOne({ email });
     if (existingUser) {
@@ -26,12 +26,8 @@ const signup = async (req, res) => {
 
     const newMember = new MemberModel({
       Member_id: memberId,
-      Name,
-      mobileno,
       email,
-      password,
-      Sponsor_code,
-      Sponsor_name,
+      ...otherDetails
     });
     await newMember.save();
     res.status(201).json({

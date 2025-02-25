@@ -14,6 +14,8 @@ const MemberSchema = new mongoose.Schema(
     gender: { type: String },
     dob: { type: String },
     password: { type: String, required: true },
+    Sponsor_code: { type: String,},
+    Sponsor_name: { type: String,},
     Date_of_joining: { type: String },
     spackage: { type: String },
     package_value: { type: Number },

@@ -45,6 +45,23 @@ const signup = async (req, res) => {
   }
 };
 
+const getSponsorDetails = async(req,res)=>{
+  try {
+    const { ref } = req.params;
+    const sponsor = await MemberModel.findOne({ Member_id: ref });
+    if (!sponsor) {
+      return res.status(404).json({ success: false, message: "Invalid Sponsor Code" });
+    }
+    res.json({
+      success: true,
+      Member_id: sponsor.Member_id,
+      name: sponsor.Name,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 const login = async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -93,4 +110,4 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { signup, login };
+module.exports = { signup,getSponsorDetails, login };

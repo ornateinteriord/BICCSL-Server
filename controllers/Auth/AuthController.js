@@ -1,7 +1,12 @@
 const AdminModel = require("../../models/Admin/Admin");
 const MemberModel = require("../../models/Users/Member");
 const jwt = require("jsonwebtoken");
-const sendSignupEmail = require("../../utils/EmailService");
+const {
+  sendSignupEmail,
+  sendRecoveryEmail,
+  sendOTPEmail,
+} = require("../../utils/EmailService");
+const { generateOTP, storeOTP, verifyOTP } = require("../../utils/OtpService");
 
 const generateUniqueMemberId = async () => {
   while (true) {
@@ -14,8 +19,7 @@ const generateUniqueMemberId = async () => {
 
 const signup = async (req, res) => {
   try {
-    const {  email,password, ...otherDetails } =
-      req.body;
+    const { email, password, ...otherDetails } = req.body;
     const existingUser = await MemberModel.findOne({ email });
     if (existingUser) {
       return res
@@ -29,10 +33,10 @@ const signup = async (req, res) => {
       Member_id: memberId,
       email,
       password,
-      ...otherDetails
+      ...otherDetails,
     });
     await newMember.save();
-   
+
     res.status(201).json({
       success: true,
       message: "Signup successful. Credentials sent to email.",
@@ -45,12 +49,14 @@ const signup = async (req, res) => {
   }
 };
 
-const getSponsorDetails = async(req,res)=>{
+const getSponsorDetails = async (req, res) => {
   try {
     const { ref } = req.params;
     const sponsor = await MemberModel.findOne({ Member_id: ref });
     if (!sponsor) {
-      return res.status(404).json({ success: false, message: "Invalid Sponsor Code" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Invalid Sponsor Code" });
     }
     res.json({
       success: true,
@@ -60,7 +66,58 @@ const getSponsorDetails = async(req,res)=>{
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
-}
+};
+
+const recoverPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await MemberModel.findOne({ email });
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Email not registered" });
+    }
+
+    await sendRecoveryEmail(user.email, user.password);
+    res.json({ success: true, message: "Password sent to your email" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { email, password, otp } = req.body;
+    const user = await MemberModel.findOne({ email });
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Email not registered" });
+    }
+
+    if (otp) {
+      if (!verifyOTP(email, otp)) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid OTP or expired" });
+      }
+      user.password = password;
+      await user.save();
+
+      return res.json({
+        success: true,
+        message: "Password reset successfully",
+      });
+    }
+    const newOtp = generateOTP();
+    storeOTP(email, newOtp);
+    await sendOTPEmail(email, newOtp);
+    return res.json({ success: true, message: "OTP sent to your email" });
+  } catch (error) {
+    console.error("Error in resetPassword:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 const login = async (req, res) => {
   try {
@@ -106,8 +163,14 @@ const login = async (req, res) => {
     console.error("Login Error:", error);
     return res
       .status(500)
-      .json({ success: false, message: "Internal server error" });
+      .json({ success: false, message: error });
   }
 };
 
-module.exports = { signup,getSponsorDetails, login };
+module.exports = {
+  signup,
+  getSponsorDetails,
+  recoverPassword,
+  resetPassword,
+  login,
+};

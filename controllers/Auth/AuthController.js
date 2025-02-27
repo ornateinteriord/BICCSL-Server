@@ -2,11 +2,14 @@ const AdminModel = require("../../models/Admin/Admin");
 const MemberModel = require("../../models/Users/Member");
 const jwt = require("jsonwebtoken");
 const {
-  sendSignupEmail,
-  sendRecoveryEmail,
-  sendOTPEmail,
+  sendMail,
 } = require("../../utils/EmailService");
 const { generateOTP, storeOTP, verifyOTP } = require("../../utils/OtpService");
+
+const signUpSubject = "Welcome to BICCSL - Your Login Credentials";
+const signUpDescription = `Dear Member,\n\nYour account has been successfully created!\n\nHere are your login details:\nUsername: ${memberId}\nPassword: ${password}\n\nPlease keep this information secure.\n\nBest regards,\nBICCSL Team`;
+const recoverySubject = "BICCSL - Password Recovery";
+const resetPasswordSubject =  "BICCSL - OTP Verification";
 
 const generateUniqueMemberId = async () => {
   while (true) {
@@ -36,13 +39,13 @@ const signup = async (req, res) => {
       ...otherDetails,
     });
     await newMember.save();
-
+    
     res.status(201).json({
       success: true,
       message: "Signup successful. Credentials sent to email.",
       user: newMember,
     });
-    await sendSignupEmail(email, memberId, password);
+    await sendMail(email,signUpSubject , signUpDescription);
   } catch (error) {
     console.error("Signup Error:", error);
     res.status(500).json({ success: false, message: error });
@@ -55,7 +58,7 @@ const getSponsorDetails = async (req, res) => {
     const sponsor = await MemberModel.findOne({ Member_id: ref });
     if (!sponsor) {
       return res
-        .status(404)
+      .status(404)
         .json({ success: false, message: "Invalid Sponsor Code" });
     }
     res.json({
@@ -74,11 +77,12 @@ const recoverPassword = async (req, res) => {
     const user = await MemberModel.findOne({ email });
     if (!user) {
       return res
-        .status(404)
-        .json({ success: false, message: "Email not registered" });
+      .status(404)
+      .json({ success: false, message: "Email not registered" });
     }
+    const recoveryDescription = `Dear Member,\n\nYou requested a password recovery. Here is your password:\n ${user.password}\n\nPlease keep this information secure.\n\nBest regards,\nBICCSL Team`;
 
-    await sendRecoveryEmail(user.email, user.password);
+    await sendMail(user.email, recoverySubject, recoveryDescription);
     res.json({ success: true, message: "Password sent to your email" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -110,8 +114,9 @@ const resetPassword = async (req, res) => {
       });
     }
     const newOtp = generateOTP();
+    const resetPasswordDescription = `Dear Member,\n\nYour OTP for password reset is: ${otp}\n\nPlease use this OTP to proceed with resetting your password.\n\nBest regards,\nYour Team`;
     storeOTP(email, newOtp);
-    await sendOTPEmail(email, newOtp);
+    await sendMail(email, resetPasswordSubject , resetPasswordDescription);
     return res.json({ success: true, message: "OTP sent to your email" });
   } catch (error) {
     console.error("Error in resetPassword:", error);

@@ -7,7 +7,6 @@ const {
 const { generateOTP, storeOTP, verifyOTP } = require("../../utils/OtpService");
 
 const signUpSubject = "Welcome to BICCSL - Your Login Credentials";
-const signUpDescription = `Dear Member,\n\nYour account has been successfully created!\n\nHere are your login details:\nUsername: ${memberId}\nPassword: ${password}\n\nPlease keep this information secure.\n\nBest regards,\nBICCSL Team`;
 const recoverySubject = "BICCSL - Password Recovery";
 const resetPasswordSubject =  "BICCSL - OTP Verification";
 
@@ -45,6 +44,7 @@ const signup = async (req, res) => {
       message: "Signup successful. Credentials sent to email.",
       user: newMember,
     });
+    const signUpDescription = `Dear Member,\n\nYour account has been successfully created!\n\nHere are your login details:\nUsername: ${memberId}\nPassword: ${password}\n\nPlease keep this information secure.\n\nBest regards,\nBICCSL Team`;
     await sendMail(email,signUpSubject , signUpDescription);
   } catch (error) {
     console.error("Signup Error:", error);
@@ -99,12 +99,16 @@ const resetPassword = async (req, res) => {
         .json({ success: false, message: "Email not registered" });
     }
 
-    if (otp) {
+    if (otp && !password) {
       if (!verifyOTP(email, otp)) {
         return res
           .status(400)
           .json({ success: false, message: "Invalid OTP or expired" });
       }
+      return res.json({ success: true, message: "OTP verified. Now set a new password." });
+    }
+    if (password) {
+    
       user.password = password;
       await user.save();
 
@@ -114,7 +118,7 @@ const resetPassword = async (req, res) => {
       });
     }
     const newOtp = generateOTP();
-    const resetPasswordDescription = `Dear Member,\n\nYour OTP for password reset is: ${otp}\n\nPlease use this OTP to proceed with resetting your password.\n\nBest regards,\nYour Team`;
+    const resetPasswordDescription = `Dear Member,\n\nYour OTP for password reset is: ${newOtp}\n\nPlease use this OTP to proceed with resetting your password.\n\nPlease keep this OTP secure.\n\nBest regards,\nYour Team`;
     storeOTP(email, newOtp);
     await sendMail(email, resetPasswordSubject , resetPasswordDescription);
     return res.json({ success: true, message: "OTP sent to your email" });

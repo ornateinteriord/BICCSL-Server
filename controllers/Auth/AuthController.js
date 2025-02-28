@@ -118,7 +118,7 @@ const resetPassword = async (req, res) => {
       });
     }
     const newOtp = generateOTP();
-    const resetPasswordDescription = `Dear Member,\n\nYour OTP for password reset is: ${newOtp}\n\nPlease use this OTP to proceed with resetting your password.\n\nPlease keep this OTP secure.\n\nBest regards,\nYour Team`;
+    const resetPasswordDescription = `Dear Member,\n\nYour OTP for password reset is: ${newOtp}\n\nPlease use this OTP to proceed with resetting your password.\n\nPlease keep don't share with anyone.\n\nBest regards,\nBICCSL Team`;
     storeOTP(email, newOtp);
     await sendMail(email, resetPasswordSubject , resetPasswordDescription);
     return res.json({ success: true, message: "OTP sent to your email" });

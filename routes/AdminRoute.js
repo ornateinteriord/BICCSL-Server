@@ -2,7 +2,7 @@ const { getHoliday, addHoliday } = require("../controllers/Admin/Holiday/Holiday
 const { getNews, addNews } = require("../controllers/Admin/News/NewsController");
 const UpdatePassword = require("../controllers/Admin/UpdatePassword");
 const getTransactionDetails = require("../controllers/Transaction/Transaction");
-const { getEpinsSummary } = require("../controllers/Users/Epin/epin");
+const { getEpinsSummary, generatePackage } = require("../controllers/Users/Epin/epin");
 const { getMemberDetails, UpdateMemberDetails, getMember } = require("../controllers/Users/Profile/Profile");
 const { editTicket, getTickets } = require("../controllers/Users/Ticket/TicketConntroller");
 const Authenticated = require("../middlewares/auth");
@@ -22,5 +22,6 @@ router.get('/getnews',Authenticated,authorizeRoles("ADMIN"),getNews)
 router.post('/addnews',Authenticated,authorizeRoles("ADMIN"),addNews)
 router.get('/getholiday',Authenticated,authorizeRoles("ADMIN"),getHoliday)
 router.post('/addholiday',Authenticated,authorizeRoles("ADMIN"),addHoliday)
+router.post('/generate-package',Authenticated,authorizeRoles("ADMIN"),generatePackage)
 
 module.exports = router;

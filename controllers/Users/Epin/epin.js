@@ -1,3 +1,4 @@
+const AdminModel = require("../../../models/Admin/Admin");
 const EpinModel = require("../../../models/Epin/epin");
 
 const getEpins = async (req, res) => {
@@ -106,4 +107,45 @@ const transferEpin = async (req, res) => {
     }
 };
 
-module.exports = { getEpins , getEpinsSummary , transferEpin};
+const generatePackage = async(req,res)=>{
+   try {
+    const { spackage, purchasedby, quantity, amount } = req.body;
+
+    if (!spackage || !purchasedby || !quantity || !amount) {
+        return res.status(400).json({success:false, message: "All fields are required!" });
+    }
+
+    if (quantity <= 0) {
+        return res.status(400).json({success:false, message: "Quantity must be at least 1!" });
+    }
+    const adminId = req.user.id;
+
+    let savedEpins = [];
+
+    for (let i = 0; i < quantity; i++) {
+        let newEpin = new EpinModel({
+            date: new Date().toISOString().split("T")[0], 
+            epin_no: generateUniqueEpin(), 
+            purchasedby,
+            spackage,
+            amount,
+            status: "active",
+        });
+
+        const savedEpin = await newEpin.save(); // Save each ePin one by one
+        savedEpins.push(savedEpin);
+    }
+    
+
+    return res.status(201).json({success:true, message: "Package  generated successfully!", data: savedEpins });
+
+   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+   }
+}
+
+const generateUniqueEpin = () => {
+    return Math.floor(100 + Math.random() * 900);
+};
+
+module.exports = { getEpins , getEpinsSummary , transferEpin, generatePackage};

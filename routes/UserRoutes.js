@@ -1,5 +1,5 @@
 const getTransactionDetails = require("../controllers/Transaction/Transaction");
-const { getEpins, transferEpin } = require("../controllers/Users/Epin/epin");
+const { getEpins, transferEpin, getPackageHistory } = require("../controllers/Users/Epin/epin");
 const {
   getMemberDetails,
   UpdateMemberDetails,
@@ -19,6 +19,7 @@ router.get("/ticket/:id" ,Authenticated,getTickets)
 router.get("/epin" ,Authenticated,getEpins)
 router.get('/sponsers',Authenticated,getSponsers)
 router.put('/transferPackage',Authenticated,transferEpin)
+router.get('/package-history',Authenticated,getPackageHistory)
 
 module.exports = router;
 

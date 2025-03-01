@@ -167,7 +167,7 @@ const getPackageHistory = async (req, res) => {
 
 const generatePackage = async(req,res)=>{
    try {
-    const { spackage, purchasedby, quantity, amount } = req.body;
+    const { spackage, purchasedby, quantity, amount,generated_by } = req.body;
 
     if (!spackage || !purchasedby || !quantity || !amount) {
         return res.status(400).json({success:false, message: "All fields are required!" });
@@ -195,6 +195,7 @@ const generatePackage = async(req,res)=>{
             spackage,
             amount:formattedAmount,
             status: "active",
+            generated_by
         });
 
         const savedEpin = await newEpin.save(); 

@@ -98,9 +98,7 @@ const transferEpin = async (req, res) => {
             }
         );
 
-        const updatedEpins = await EpinModel.find({ epin_id: { $in: epinIds } });
-
-        res.status(200).json({ success: true, message: "Package transferred successfully", updatedEpins });
+        res.status(200).json({ success: true, message: "Package transferred successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -183,7 +181,7 @@ const generatePackage = async(req,res)=>{
     }
     
 
-    return res.status(201).json({success:true, message: "Package  generated successfully!", data: savedEpins });
+    return res.status(201).json({success:true, message: "Package  generated successfully!" });
 
    } catch (error) {
     res.status(500).json({ success: false, message: error.message });

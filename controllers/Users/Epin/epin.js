@@ -116,22 +116,43 @@ const getPackageHistory = async (req, res) => {
                 $match: { transfered_by: memberId, status: "active" }
             },
             {
+                $lookup: {
+                    from: "member_tbl",
+                    localField: "transfered_to",
+                    foreignField: "Member_id",
+                    as: "memberInfo"
+                }
+            },
+            {
+                $unwind: {
+                    path: "$memberInfo",
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
                 $group: {
                     _id: { transfered_on: "$transfered_on", transfered_to: "$transfered_to", spackage: "$spackage" },
-                    quantity: { $sum: 1 }, // Count the occurrences of the same `spackage`
-                    amount: { $first: "$amount" } // Take the first `amount` per package
+                    quantity: { $sum: 1 },
+                    amount: { $first: "$amount" },
+                    transfered_to_name: { $first: "$memberInfo.Name" }
                 }
             },
             {
                 $project: {
                     _id: 0,
                     date: "$_id.transfered_on",
-                    transfered_to: "$_id.transfered_to",
+                    transfered_to: {
+                        $cond: {
+                            if: { $eq: ["$transfered_to_name", null] },
+                            then: { $concat: ["(", "$_id.transfered_to", ")"] },
+                            else: { $concat: ["$transfered_to_name", " ( ", "$_id.transfered_to", " )"] }
+                        }
+                    },
                     quantity: "$quantity",
-                    package: { $concat: ["$_id.spackage", " - ", { $toString: "$amount" }] } // Concatenate `spackage - amount`
+                    package: { $concat: ["$_id.spackage", " - ", { $toString: "$amount" }] }
                 }
             },
-            { $sort: { date: -1 } } // Sorting by latest transfer date
+            { $sort: { date: -1 } }
         ]);
 
         if (!epins.length) {

@@ -98,9 +98,7 @@ const transferEpin = async (req, res) => {
             }
         );
 
-        const updatedEpins = await EpinModel.find({ epin_id: { $in: epinIds } });
-
-        res.status(200).json({ success: true, message: "Package transferred successfully", updatedEpins });
+        res.status(200).json({ success: true, message: "Package transferred successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -146,5 +144,68 @@ const getPackageHistory = async (req, res) => {
     }
 };
 
+const generatePackage = async(req,res)=>{
+   try {
+    const { spackage, purchasedby, quantity, amount } = req.body;
 
-module.exports = { getEpins , getEpinsSummary , transferEpin , getPackageHistory};
+    if (!spackage || !purchasedby || !quantity || !amount) {
+        return res.status(400).json({success:false, message: "All fields are required!" });
+    }
+
+    if (quantity <= 0) {
+        return res.status(400).json({success:false, message: "Quantity must be at least 1!" });
+    }
+
+    let savedEpins = [];
+
+    for (let i = 0; i < quantity; i++) {
+        const lastEpin = await EpinModel.aggregate([
+            { $sort: { epin_id: -1 } }, 
+            { $limit: 1 },
+            { $project: { epin_id: 1 } } 
+        ]);
+        const newEpinId = lastEpin.length > 0 ? lastEpin[0].epin_id + 1 : 1;
+        let formattedAmount = `${amount} (${formatAmount(amount)})`;
+        let newEpin = new EpinModel({
+            epin_id: newEpinId,
+            date: new Date().toISOString().split("T")[0], 
+            epin_no: generateUniqueEpin(), 
+            purchasedby,
+            spackage,
+            amount:formattedAmount,
+            status: "active",
+        });
+
+        const savedEpin = await newEpin.save(); 
+        savedEpins.push(savedEpin);
+    }
+    
+
+    return res.status(201).json({success:true, message: "Package  generated successfully!" });
+
+   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+   }
+}
+
+const generateUniqueEpin = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    let epinNo = "";
+    for (let i = 0; i < 7; i++) {
+        epinNo += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return epinNo;
+};
+
+const formatAmount = (num) => {
+    let formatted = new Intl.NumberFormat("en-US", {
+        notation: "compact",
+        maximumFractionDigits: 1
+    }).format(num);
+    if (!formatted.includes(".")) {
+        formatted = formatted.replace(/(\d+)/, "$1.0"); 
+    }
+    return formatted;
+};
+
+module.exports = { getEpins , getEpinsSummary , transferEpin, generatePackage,getPackageHistory};

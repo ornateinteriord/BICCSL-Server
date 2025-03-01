@@ -1,4 +1,3 @@
-const AdminModel = require("../../../models/Admin/Admin");
 const EpinModel = require("../../../models/Epin/epin");
 
 const getEpins = async (req, res) => {
@@ -147,8 +146,6 @@ const getPackageHistory = async (req, res) => {
     }
 };
 
-
-module.exports = { getEpins , getEpinsSummary , transferEpin , getPackageHistory};
 const generatePackage = async(req,res)=>{
    try {
     const { spackage, purchasedby, quantity, amount } = req.body;
@@ -160,21 +157,28 @@ const generatePackage = async(req,res)=>{
     if (quantity <= 0) {
         return res.status(400).json({success:false, message: "Quantity must be at least 1!" });
     }
-    const adminId = req.user.id;
 
     let savedEpins = [];
 
     for (let i = 0; i < quantity; i++) {
+        const lastEpin = await EpinModel.aggregate([
+            { $sort: { epin_id: -1 } }, 
+            { $limit: 1 },
+            { $project: { epin_id: 1 } } 
+        ]);
+        const newEpinId = lastEpin.length > 0 ? lastEpin[0].epin_id + 1 : 1;
+        let formattedAmount = `${amount} (${formatAmount(amount)})`;
         let newEpin = new EpinModel({
+            epin_id: newEpinId,
             date: new Date().toISOString().split("T")[0], 
             epin_no: generateUniqueEpin(), 
             purchasedby,
             spackage,
-            amount,
+            amount:formattedAmount,
             status: "active",
         });
 
-        const savedEpin = await newEpin.save(); // Save each ePin one by one
+        const savedEpin = await newEpin.save(); 
         savedEpins.push(savedEpin);
     }
     
@@ -187,7 +191,23 @@ const generatePackage = async(req,res)=>{
 }
 
 const generateUniqueEpin = () => {
-    return Math.floor(100 + Math.random() * 900);
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    let epinNo = "";
+    for (let i = 0; i < 7; i++) {
+        epinNo += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return epinNo;
 };
 
-module.exports = { getEpins , getEpinsSummary , transferEpin, generatePackage};
+const formatAmount = (num) => {
+    let formatted = new Intl.NumberFormat("en-US", {
+        notation: "compact",
+        maximumFractionDigits: 1
+    }).format(num);
+    if (!formatted.includes(".")) {
+        formatted = formatted.replace(/(\d+)/, "$1.0"); 
+    }
+    return formatted;
+};
+
+module.exports = { getEpins , getEpinsSummary , transferEpin, generatePackage,getPackageHistory};

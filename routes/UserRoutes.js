@@ -1,5 +1,5 @@
 const getTransactionDetails = require("../controllers/Transaction/Transaction");
-const { getEpins } = require("../controllers/Users/Epin/epin");
+const { getEpins, transferEpin } = require("../controllers/Users/Epin/epin");
 const {
   getMemberDetails,
   UpdateMemberDetails,
@@ -18,6 +18,7 @@ router.post("/ticket" ,Authenticated,createTicket)
 router.get("/ticket/:id" ,Authenticated,getTickets)
 router.get("/epin" ,Authenticated,getEpins)
 router.get('/sponsers',Authenticated,getSponsers)
+router.put('/transferPackage',Authenticated,transferEpin)
 
 module.exports = router;
 

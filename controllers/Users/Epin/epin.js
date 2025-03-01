@@ -68,7 +68,7 @@ const transferEpin = async (req, res) => {
         if (transfered_to === memberId) {
             return res.status(400).json({ success: false, message: "You cannot transfer your package to yourself" });
         }
-        
+
         if (quantity > activeEpins.length) {
             return res.status(400).json({
                 success: false,
@@ -106,4 +106,45 @@ const transferEpin = async (req, res) => {
     }
 };
 
-module.exports = { getEpins , getEpinsSummary , transferEpin};
+const getPackageHistory = async (req, res) => {
+    try {
+        const memberId = req.user?.memberId;
+        if (!memberId) {
+            return res.status(400).json({ success: false, message: "Invalid user" });
+        }
+
+        const epins = await EpinModel.aggregate([
+            {
+                $match: { transfered_by: memberId, status: "active" }
+            },
+            {
+                $group: {
+                    _id: { transfered_on: "$transfered_on", transfered_to: "$transfered_to", spackage: "$spackage" },
+                    quantity: { $sum: 1 }, // Count the occurrences of the same `spackage`
+                    amount: { $first: "$amount" } // Take the first `amount` per package
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    date: "$_id.transfered_on",
+                    transfered_to: "$_id.transfered_to",
+                    quantity: "$quantity",
+                    package: { $concat: ["$_id.spackage", " - ", { $toString: "$amount" }] } // Concatenate `spackage - amount`
+                }
+            },
+            { $sort: { date: -1 } } // Sorting by latest transfer date
+        ]);
+
+        if (!epins.length) {
+            return res.status(400).json({ success: false, message: "No active epins available" });
+        }
+
+        res.status(200).json({ success: true, epins });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+
+module.exports = { getEpins , getEpinsSummary , transferEpin , getPackageHistory};

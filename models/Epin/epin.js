@@ -12,6 +12,9 @@ const epinSchema = new mongoose.Schema({
     used_on: { type: String, default: null }, 
     used_for: { type: String, default: null }, 
     generated_by: { type: String, }, 
+    transfered_by: { type: String, },
+    transfered_on: { type: Date, default : Date.now },
+    transfered_to: { type: String, },
 }, { timestamps: true , collection: "epin_tbl" });
 
 epinSchema.plugin(AutoIncrement, { inc_field: "epin_id" });

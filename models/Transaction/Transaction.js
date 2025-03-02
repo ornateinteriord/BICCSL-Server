@@ -1,13 +1,7 @@
 const mongoose = require("mongoose");
-const MemberModel = require("../Users/Member");
 
 const TransactionSchema = new mongoose.Schema(
   {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: MemberModel,
-      required: true
-    },
     transaction_id: { type: String },
     transaction_date: { type: String },
     member_id: { type: String },

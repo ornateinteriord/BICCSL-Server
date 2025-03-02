@@ -13,7 +13,7 @@ const router = require("express").Router();
 
 router.get("/member/:id",Authenticated, getMemberDetails);
 router.put("/member/:memberId",Authenticated, UpdateMemberDetails);
-router.get("/transactions/:id",Authenticated,getTransactionDetails)
+router.get("/transactions",Authenticated,getTransactionDetails)
 router.post("/ticket" ,Authenticated,createTicket)
 router.get("/ticket/:id" ,Authenticated,getTickets)
 router.get("/epin" ,Authenticated,getEpins)

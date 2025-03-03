@@ -17,7 +17,7 @@ router.get("/transactions",Authenticated,getTransactionDetails)
 router.post("/ticket" ,Authenticated,createTicket)
 router.get("/ticket/:id" ,Authenticated,getTickets)
 router.get("/epin" ,Authenticated,getEpins)
-router.get('/sponsers',Authenticated,getSponsers)
+router.get('/sponsers/:memberId',Authenticated,getSponsers)
 router.put('/transferPackage',Authenticated,transferEpin)
 router.get('/package-history',Authenticated,getPackageHistory)
 

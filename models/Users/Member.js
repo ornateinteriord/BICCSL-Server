@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const moment = require("moment");
 
 const MemberSchema = new mongoose.Schema(
   {
@@ -16,7 +17,7 @@ const MemberSchema = new mongoose.Schema(
     password: { type: String, required: true },
     Sponsor_code: { type: String,},
     Sponsor_name: { type: String,},
-    Date_of_joining: { type: String },
+    Date_of_joining: { type: String, default: () => moment().format("YYYY-MM-DD") },
     spackage: { type: String },
     package_value: { type: Number },
     epin_no: { type: String },

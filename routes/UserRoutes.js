@@ -5,6 +5,7 @@ const {
   UpdateMemberDetails,
 } = require("../controllers/Users/Profile/Profile");
 const { getSponsers } = require("../controllers/Users/Sponser/sponser");
+const { getMultiLevelSponsorship } = require("../controllers/Users/Sponser/multiLevelSponsorship");
 const { createTicket, getTickets } = require("../controllers/Users/Ticket/TicketConntroller");
 const Authenticated = require("../middlewares/auth");
 
@@ -20,6 +21,7 @@ router.get("/epin" ,Authenticated,getEpins)
 router.get('/sponsers/:memberId',Authenticated,getSponsers)
 router.put('/transferPackage',Authenticated,transferEpin)
 router.get('/package-history',Authenticated,getPackageHistory)
+router.get('/multi-level-sponsors',Authenticated,getMultiLevelSponsorship)
 
 module.exports = router;
 

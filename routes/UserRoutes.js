@@ -4,7 +4,7 @@ const {
   getMemberDetails,
   UpdateMemberDetails,
 } = require("../controllers/Users/Profile/Profile");
-const { getSponsers } = require("../controllers/Users/Sponser/sponser");
+const { getSponsers, checkSponsorReward } = require("../controllers/Users/Sponser/sponser");
 const { createTicket, getTickets } = require("../controllers/Users/Ticket/TicketConntroller");
 const Authenticated = require("../middlewares/auth");
 
@@ -17,9 +17,10 @@ router.get("/transactions",Authenticated,getTransactionDetails)
 router.post("/ticket" ,Authenticated,createTicket)
 router.get("/ticket/:id" ,Authenticated,getTickets)
 router.get("/epin" ,Authenticated,getEpins)
-router.get('/sponsers/:memberId',Authenticated,getSponsers)
+router.get('/sponsers/:memberId',getSponsers)
 router.put('/transferPackage',Authenticated,transferEpin)
 router.get('/package-history',Authenticated,getPackageHistory)
+router.get("/check-sponsor-reward/:memberId",Authenticated, checkSponsorReward);
 
 module.exports = router;
 

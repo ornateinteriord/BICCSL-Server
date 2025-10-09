@@ -27,7 +27,7 @@ const MemberSchema = new mongoose.Schema(
     Nominee_name: { type: String },
     Nominee_age: { type: Number },
     Nominee_Relation: { type: String },
-    status: { type: String, default: "active" },
+  status: { type: String, enum: ["Pending", "Active"], default: "Pending" },
     node: { type: String },
     transaction_pass: { type: String },
     bdb_value: { type: String },

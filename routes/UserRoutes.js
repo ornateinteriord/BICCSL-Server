@@ -23,7 +23,7 @@ router.get('/sponsers/:memberId',Authenticated,getSponsers)
 router.put('/transferPackage',Authenticated,transferEpin)
 router.get('/package-history',Authenticated,getPackageHistory)
 router.get("/check-sponsor-reward/:memberId", Authenticated, checkSponsorReward);
-router.get('/multi-level-sponsors',getMultiLevelSponsorship)
+router.get('/multi-level-sponsors',Authenticated,getMultiLevelSponsorship)
 router.get("/overview/:memberId",Authenticated, getWalletOverview);
 router.post("/withdraw", Authenticated,getWalletWithdraw);
 

@@ -38,48 +38,45 @@ const getSponsers = async (req, res) => {
     }
   };
 
-const checkSponsorReward = async (req, res) => {
-    try {
-        const { memberId } = req.params;
 
-        if (!memberId) {
-            return res.status(400).json({ success: false, message: "Member ID is required" });
-        }
+  const checkSponsorReward = async (req, res) => {
+  try {
+    const { memberId } = req.params;
 
-        // Check if parent user exists
-        const parentUser = await MemberModel.findOne({ Member_id: memberId });
-        if (!parentUser) {
-            return res.status(404).json({ success: false, message: "Member not found" });
-        }
-
-        // Count sponsored users
-        const sponsorCount = await MemberModel.countDocuments({ Sponsor_code: memberId });
-        const isEligible = sponsorCount >= 2;
-
-        // Update eligibility status in database
-        if (isEligible !== parentUser.isEligibleForReward) {
-            await MemberModel.updateOne(
-                { Member_id: memberId },
-                { $set: { isEligibleForReward: isEligible } }
-            );
-        }
-
-        return res.status(200).json({
-            success: true,
-            memberId,
-            sponsorCount,
-            isEligible,
-            message: isEligible
-                ? `Eligible for reward claim (${sponsorCount} sponsored users)`
-                : `Not eligible for reward claim. Need ${2 - sponsorCount} more users.`
-        });
-    } catch (error) {
-        console.error("Error checking sponsor reward:", error);
-        return res.status(500).json({ success: false, message: "Server error" });
+    if (!memberId) {
+      return res.status(400).json({ success: false, message: "Member ID is required" });
     }
+
+    const parentUser = await MemberModel.findOne({ Member_id: memberId });
+
+    if (!parentUser) {
+      return res.status(404).json({ success: false, message: "Member not found" });
+    }
+
+    const sponsoredCount = await MemberModel.countDocuments({ 
+      Sponsor_code: memberId 
+    });
+
+    const isEligibleForReward = sponsoredCount >= 2;
+    
+    const rewardMessage = isEligibleForReward 
+      ? `Congratulations! You have sponsored ${sponsoredCount} members and are eligible to claim your reward.`
+      : `You need to sponsor ${2 - sponsoredCount} more member(s) to become eligible for the reward.`;
+
+    res.json({
+      success: true,
+      memberId: memberId,
+      memberName: parentUser.Name,
+      sponsoredCount: sponsoredCount,
+      isEligibleForReward: isEligibleForReward,
+      message: rewardMessage,
+      requiredForEligibility: 2
+    });
+
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
 };
-
-
 
   module.exports = { getSponsers ,checkSponsorReward };
 

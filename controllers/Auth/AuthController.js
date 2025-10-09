@@ -5,8 +5,8 @@ const {
   sendMail,
 } = require("../../utils/EmailService");
 const { generateOTP, storeOTP, verifyOTP } = require("../../utils/OtpService");
+const { generateMSCSEmail } = require("../../utils/generateMSCSEmail");
 
-const signUpSubject = "Welcome to BICCSL - Your Login Credentials";
 const recoverySubject = "BICCSL - Password Recovery";
 const resetPasswordSubject =  "BICCSL - OTP Verification";
 
@@ -21,12 +21,10 @@ const generateUniqueMemberId = async () => {
 
 const signup = async (req, res) => {
   try {
-    const { email, password, ...otherDetails } = req.body;
+    const { email, password, Name, ...otherDetails } = req.body;
     const existingUser = await MemberModel.findOne({ email });
     if (existingUser) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Email already in use" });
+      return res.status(400).json({ success: false, message: "Email already in use" });
     }
 
     const memberId = await generateUniqueMemberId();
@@ -35,20 +33,37 @@ const signup = async (req, res) => {
       Member_id: memberId,
       email,
       password,
+      Name,
       ...otherDetails,
     });
     await newMember.save();
-    
+
+    try {
+
+      const { welcomeMessage, welcomeSubject } = generateMSCSEmail(memberId, password, Name);
+      
+      const textContent = `Dear ${Name}, Your account registration with MSCS has been completed. Member ID: ${memberId}, Password: ${password}. Your account is under verification process.`;
+      
+
+      await sendMail(email, welcomeSubject, welcomeMessage, textContent);
+
+    } catch (emailError) {
+
+    }
+
     res.status(201).json({
       success: true,
       message: "Signup successful. Credentials sent to email.",
-      user: newMember,
+      user: {
+        Member_id: newMember.Member_id,
+        email: newMember.email,
+        Name: newMember.Name
+      },
     });
-    const signUpDescription = `Dear Member,\n\nYour account has been successfully created!\n\nHere are your login details:\nUsername: ${memberId}\nPassword: ${password}\n\nPlease keep this information secure.\n\nBest regards,\nBICCSL Team`;
-    await sendMail(email,signUpSubject , signUpDescription);
+
   } catch (error) {
     console.error("Signup Error:", error);
-    res.status(500).json({ success: false, message: error });
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 

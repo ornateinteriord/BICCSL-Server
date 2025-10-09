@@ -38,5 +38,45 @@ const getSponsers = async (req, res) => {
     }
   };
 
-  module.exports = { getSponsers };
+
+  const checkSponsorReward = async (req, res) => {
+  try {
+    const { memberId } = req.params;
+
+    if (!memberId) {
+      return res.status(400).json({ success: false, message: "Member ID is required" });
+    }
+
+    const parentUser = await MemberModel.findOne({ Member_id: memberId });
+
+    if (!parentUser) {
+      return res.status(404).json({ success: false, message: "Member not found" });
+    }
+
+    const sponsoredCount = await MemberModel.countDocuments({ 
+      Sponsor_code: memberId 
+    });
+
+    const isEligibleForReward = sponsoredCount >= 2;
+    
+    const rewardMessage = isEligibleForReward 
+      ? `Congratulations! You have sponsored ${sponsoredCount} members and are eligible to claim your reward.`
+      : `You need to sponsor ${2 - sponsoredCount} more member(s) to become eligible for the reward.`;
+
+    res.json({
+      success: true,
+      memberId: memberId,
+      memberName: parentUser.Name,
+      sponsoredCount: sponsoredCount,
+      isEligibleForReward: isEligibleForReward,
+      message: rewardMessage,
+      requiredForEligibility: 2
+    });
+
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+};
+
+  module.exports = { getSponsers ,checkSponsorReward };
 

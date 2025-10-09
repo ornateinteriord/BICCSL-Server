@@ -160,6 +160,7 @@ const login = async (req, res) => {
       { expiresIn: "24h" }
     );
     return res.status(200).json({
+       
       success: true,
       role: userRole,
       user: foundUser,
@@ -167,7 +168,9 @@ const login = async (req, res) => {
       message: `${
         userRole.charAt(0).toUpperCase() + userRole.slice(1).toLowerCase()
       } login successful`,
+      
     });
+   
   } catch (error) {
     console.error("Login Error:", error);
     return res

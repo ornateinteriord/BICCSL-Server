@@ -28,4 +28,3 @@ router.get("/overview/:memberId",Authenticated, getWalletOverview);
 router.post("/withdraw", Authenticated,getWalletWithdraw);
 
 module.exports = router;
-

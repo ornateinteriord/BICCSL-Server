@@ -28,7 +28,48 @@ const getMemberDetails = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
- 
+const activateMemberPackage = async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    
+    let query;
+    if (mongoose.Types.ObjectId.isValid(memberId)) {
+      query = { _id: memberId };
+    } else {
+      query = { Member_id: memberId };
+    }
+
+    const updatedMember = await MemberModel.findOneAndUpdate(
+      query,
+      {
+        status: 'active',
+        spackage: 'standard', 
+        package_value: 2600
+      },
+      { new: true } 
+    );
+
+    if (!updatedMember) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Member not found" 
+      });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      data: updatedMember,
+      message: "Package activated successfully" 
+    });
+
+  } catch (error) {
+    console.error("Error activating package:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: "Server error" 
+    });
+  }
+};
 const getMember = async(req,res)=>{
   try {
     if(req.user.role !== "ADMIN"){
@@ -130,4 +171,4 @@ const UpdateMemberDetails = async (req, res) => {
   }
 };
 
-module.exports = { getMemberDetails, UpdateMemberDetails,getMember };
+module.exports = { getMemberDetails, UpdateMemberDetails,getMember ,activateMemberPackage};

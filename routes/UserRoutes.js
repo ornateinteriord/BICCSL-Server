@@ -30,4 +30,3 @@ router.post("/withdraw", Authenticated,getWalletWithdraw);
 router.put("/activate-package/:memberId",Authenticated, activateMemberPackage);
 
 module.exports = router;
-

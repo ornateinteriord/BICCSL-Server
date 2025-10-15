@@ -1,7 +1,6 @@
 const TransactionModel = require("../../../models/Transaction/Transaction");
 const MemberModel = require("../../../models/Users/Member");
 
-// ------------------ GET WALLET OVERVIEW ------------------
 const getWalletOverview = async (req, res) => {
   try {
     const { memberId } = req.params;
@@ -14,28 +13,39 @@ const getWalletOverview = async (req, res) => {
       return res.status(404).json({ success: false, message: "Member not found" });
     }
 
-    // Fetch all transactions for this member
     const transactions = await TransactionModel.find({ member_id: memberId });
 
-    // Available balance: only completed transactions
     const completedTx = transactions.filter(tx => tx.status === "Completed");
     const availableBalance = completedTx.reduce((acc, tx) => acc + (parseFloat(tx.ew_credit) || 0) - (parseFloat(tx.ew_debit) || 0), 0);
 
-    // Total income: sum of all credits
     const totalIncome = transactions.reduce((acc, tx) => acc + (parseFloat(tx.ew_credit) || 0), 0);
-
-    // Total expenses: sum of all debits
     const totalExpenses = transactions.reduce((acc, tx) => acc + (parseFloat(tx.ew_debit) || 0), 0);
 
-    // Total withdrawal: sum of debits for withdrawals
     const totalWithdrawal = transactions
       .filter(tx => tx.transaction_type === "Withdrawal")
       .reduce((acc, tx) => acc + (parseFloat(tx.ew_debit) || 0), 0);
 
-    // Other debits: sum of debits for non-withdrawals
     const otherDebits = transactions
       .filter(tx => tx.transaction_type !== "Withdrawal")
       .reduce((acc, tx) => acc + (parseFloat(tx.ew_debit) || 0), 0);
+
+    const levelBenefits = transactions
+      .filter(tx => 
+        tx.transaction_type === "Level benefits" || 
+        tx.description === "Level benefits" ||
+        tx.transaction_type === "Level Benefits" || 
+        tx.description === "Level Benefits"
+      )
+      .reduce((acc, tx) => acc + (parseFloat(tx.ew_credit) || 0), 0);
+
+    const directBenefits = transactions
+      .filter(tx => 
+        tx.transaction_type === "Direct Benefits" || 
+        tx.description === "Direct Benefits" ||
+        tx.transaction_type === "Direct benefits" || 
+        tx.description === "Direct benefits"
+      )
+      .reduce((acc, tx) => acc + (parseFloat(tx.ew_credit) || 0), 0);
 
     return res.status(200).json({
       success: true,
@@ -47,6 +57,9 @@ const getWalletOverview = async (req, res) => {
         otherDebits: otherDebits.toFixed(2),
         transactionsCount: transactions.length,
         availableForWithdrawal: availableBalance.toFixed(2),
+        levelBenefits: levelBenefits.toFixed(2),
+        directBenefits: directBenefits.toFixed(2),
+        totalBenefits: (levelBenefits + directBenefits).toFixed(2),
         calculation: {
           formula: "Available Balance = Sum of Completed Credits - Sum of Completed Debits",
           breakdown: `₹${completedTx.reduce((acc, tx) => acc + (parseFloat(tx.ew_credit) || 0), 0).toFixed(2)} - ₹${completedTx.reduce((acc, tx) => acc + (parseFloat(tx.ew_debit) || 0), 0).toFixed(2)} = ₹${availableBalance.toFixed(2)}`,
@@ -60,7 +73,6 @@ const getWalletOverview = async (req, res) => {
   }
 };
 
-// ------------------ GET WALLET WITHDRAW ------------------
 const getWalletWithdraw = async (req, res) => {
   try {
     const { memberId, amount } = req.body;
@@ -75,7 +87,6 @@ const getWalletWithdraw = async (req, res) => {
 
     const member = await MemberModel.findOne({ Member_id: memberId });
     if (!member) return res.status(404).json({ success: false, message: "Member not found" });
-
 
     const transactions = await TransactionModel.find({
       member_id: memberId,
@@ -93,6 +104,25 @@ const getWalletWithdraw = async (req, res) => {
     let availableBalance = totalCompletedCredits - totalCompletedDebits;
     availableBalance = Math.max(0, availableBalance);
 
+    const allTransactions = await TransactionModel.find({ member_id: memberId });
+
+    const levelBenefits = allTransactions
+      .filter(tx => 
+        tx.transaction_type === "Level benefits" || 
+        tx.description === "Level benefits" ||
+        tx.transaction_type === "Level Benefits" || 
+        tx.description === "Level Benefits"
+      )
+      .reduce((acc, tx) => acc + (parseFloat(tx.ew_credit) || 0), 0);
+
+    const directBenefits = allTransactions
+      .filter(tx => 
+        tx.transaction_type === "Direct Benefits" || 
+        tx.description === "Direct Benefits" ||
+        tx.transaction_type === "Direct benefits" || 
+        tx.description === "Direct benefits"
+      )
+      .reduce((acc, tx) => acc + (parseFloat(tx.ew_credit) || 0), 0);
 
     if (withdrawalAmount < 500) {
       return res.status(400).json({ 
@@ -119,14 +149,18 @@ const getWalletWithdraw = async (req, res) => {
           available: availableBalance.toFixed(2),
           shortfall: (withdrawalAmount - availableBalance).toFixed(2),
         },
+        benefitsBreakdown: {
+          levelBenefits: levelBenefits.toFixed(2),
+          directBenefits: directBenefits.toFixed(2),
+          totalBenefits: (levelBenefits + directBenefits).toFixed(2),
+          availableBalance: availableBalance.toFixed(2)
+        }
       });
     }
 
-    // Calculate deduction and net amount
     const deduction = withdrawalAmount * 0.15;
     const netAmount = withdrawalAmount - deduction;
 
-    // Generate transaction ID
     const lastTransaction = await TransactionModel.findOne({})
       .sort({ createdAt: -1 })
       .exec();
@@ -137,24 +171,27 @@ const getWalletWithdraw = async (req, res) => {
       newTransactionId = lastIdNumber + 1;
     }
 
-    // Create withdrawal transaction
     const newTransaction = new TransactionModel({
-      transaction_id: `TXN${newTransactionId.toString().padStart(6, '0')}`,
+      transaction_id: newTransactionId.toString(),
       transaction_date: new Date(),
       member_id: memberId,
       description: "Withdrawal Request",
       transaction_type: "Withdrawal",
       ew_credit: 0,
       ew_debit: withdrawalAmount,
-      status: "Pending", // Initial status
+      status: "Pending",
       deduction: deduction,
       net_amount: netAmount,
-      gross_amount: withdrawalAmount
+      gross_amount: withdrawalAmount,
+      benefits_source: {
+        level_benefits_used: levelBenefits,
+        direct_benefits_used: directBenefits,
+        total_benefits_available: levelBenefits + directBenefits
+      }
     });
 
     await newTransaction.save();
 
-    // Calculate new available balance (excluding this pending withdrawal)
     let newAvailableBalance = availableBalance - withdrawalAmount;
     newAvailableBalance = Math.max(0, newAvailableBalance);
 
@@ -174,6 +211,12 @@ const getWalletWithdraw = async (req, res) => {
           withdrawalAmount: withdrawalAmount.toFixed(2),
           newAvailableBalance: newAvailableBalance.toFixed(2)
         },
+        benefitsBreakdown: {
+          levelBenefits: levelBenefits.toFixed(2),
+          directBenefits: directBenefits.toFixed(2),
+          totalBenefits: (levelBenefits + directBenefits).toFixed(2),
+          benefitsContribution: `${((levelBenefits + directBenefits) / totalCompletedCredits * 100).toFixed(1)}% of total income`
+        },
         status: "Pending",
         calculation: {
           deduction: `15% of ₹${withdrawalAmount.toFixed(2)} = ₹${deduction.toFixed(2)}`,
@@ -184,7 +227,11 @@ const getWalletWithdraw = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in getWalletWithdraw:", error);
-    return res.status(500).json({ success: false, message: "Server error", error: error.message });
+    return res.status(500).json({ 
+      success: false, 
+      message: "Server error", 
+      error: error.message 
+    });
   }
 };
 

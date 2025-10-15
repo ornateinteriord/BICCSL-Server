@@ -1,31 +1,33 @@
+import TransactionModel from "../../../models/Transaction/Transaction.js";
 
-import PayoutModel from "../../../models/Payout/Payout.js";
-import MemberModel from "../../../models/Users/Member.js";
-
+// ----------- LEVEL BENEFITS -----------
 export const getLevelBenefits = async (req, res) => {
   try {
-    const { memberId } = req.params;
+    const { member_id } = req.params;
 
-    // Fetch payout data
-    const payoutResult = await PayoutModel.aggregate([
-      { $match: { memberId, payout_type: "Level benefits" } },
-      { $group: { _id: "$member_id", totalAmount: { $sum: "$amount" } } },
-    ]);
+    // Fetch all transactions for this member
+    const transactions = await TransactionModel.find({ member_id });
 
-    // Fetch member details
-    const member = await MemberModel.findOne({ memberId }).select(
-      "member_id first_name last_name email mobile status"
-    );
-
-    if (!member) {
-      return res.status(404).json({ message: "Member not found" });
+    if (!transactions || transactions.length === 0) {
+      return res.status(404).json({
+        message: "No transactions found for this member",
+        member_id
+      });
     }
 
-    const totalAmount = payoutResult.length > 0 ? payoutResult[0].totalAmount : 0;
+    // Level Benefits: sum of credits for level benefits (case-insensitive)
+    const levelBenefits = transactions
+      .filter(tx => {
+        const type = (tx.transaction_type || "").toLowerCase();
+        const desc = (tx.description || "").toLowerCase();
+        return type === "level benefits" || desc === "level benefits";
+      })
+      .reduce((acc, tx) => acc + (Number(tx.ew_credit) || 0), 0);
 
     res.json({
-      member,
-      totalAmount,
+      member_id,
+      totalLevelBenefits: levelBenefits.toFixed(2),
+      transactionCount: transactions.length
     });
   } catch (error) {
     console.error("Error fetching level benefits:", error);
@@ -33,57 +35,48 @@ export const getLevelBenefits = async (req, res) => {
   }
 };
 
-/**
- * ✅ getDailyPayout
- * Returns Level + Direct Benefits (gross profit) + member details
- */
+// ----------- DAILY PAYOUT -----------
 export const getDailyPayout = async (req, res) => {
   try {
-    const { memberId } = req.params;
+    const { member_id } = req.params;
 
-    // Fetch payout data
-    const payoutResult = await PayoutModel.aggregate([
-      {
-        $match: {
-          memberId,
-          payout_type: { $in: ["Level benefits", "Direct Benefits"] },
-        },
-      },
-      {
-        $group: {
-          _id: "$member_id",
-          levelAmount: {
-            $sum: {
-              $cond: [{ $eq: ["$payout_type", "Level benefits"] }, "$amount", 0],
-            },
-          },
-          directAmount: {
-            $sum: {
-              $cond: [{ $eq: ["$payout_type", "Direct Benefits"] }, "$amount", 0],
-            },
-          },
-          grossProfit: { $sum: "$amount" },
-        },
-      },
-    ]);
+    // Fetch all transactions for this member
+    const transactions = await TransactionModel.find({ member_id });
 
-    // Fetch member details
-    const member = await MemberModel.findOne({ member_id }).select(
-      "member_id first_name last_name email mobile status"
-    );
-
-    if (!member) {
-      return res.status(404).json({ message: "Member not found" });
+    if (!transactions || transactions.length === 0) {
+      return res.status(404).json({
+        message: "No transactions found for this member",
+        member_id
+      });
     }
 
-    const payoutData =
-      payoutResult.length > 0
-        ? payoutResult[0]
-        : { levelAmount: 0, directAmount: 0, grossProfit: 0 };
+    // Level Benefits: sum of credits for level benefits (case-insensitive)
+    const levelBenefits = transactions
+      .filter(tx => {
+        const type = (tx.transaction_type || "").toLowerCase();
+        const desc = (tx.description || "").toLowerCase();
+        return type === "level benefits" || desc === "level benefits";
+      })
+      .reduce((acc, tx) => acc + (Number(tx.ew_credit) || 0), 0);
+
+    // Direct Benefits: sum of credits for direct benefits (case-insensitive)
+    const directBenefits = transactions
+      .filter(tx => {
+        const type = (tx.transaction_type || "").toLowerCase();
+        const desc = (tx.description || "").toLowerCase();
+        return type === "direct benefits" || desc === "direct benefits";
+      })
+      .reduce((acc, tx) => acc + (Number(tx.ew_credit) || 0), 0);
+
+    // Gross profit: sum of both
+    const grossProfit = levelBenefits + directBenefits;
 
     res.json({
-      member,
-      ...payoutData,
+      member_id,
+      levelBenefits: levelBenefits.toFixed(2),
+      directBenefits: directBenefits.toFixed(2),
+      grossProfit: grossProfit.toFixed(2),
+      transactionCount: transactions.length
     });
   } catch (error) {
     console.error("Error fetching daily payout:", error);

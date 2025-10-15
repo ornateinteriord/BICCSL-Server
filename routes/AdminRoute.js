@@ -23,5 +23,6 @@ router.post('/addnews',Authenticated,authorizeRoles("ADMIN"),addNews)
 router.get('/getholiday',Authenticated,authorizeRoles("ADMIN"),getHoliday)
 router.post('/addholiday',Authenticated,authorizeRoles("ADMIN"),addHoliday)
 router.post('/generate-package',Authenticated,authorizeRoles("ADMIN"),generatePackage)
+ 
 
 module.exports = router;

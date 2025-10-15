@@ -7,12 +7,12 @@ const {
 const { generateOTP, storeOTP, verifyOTP } = require("../../utils/OtpService");
 const { generateMSCSEmail } = require("../../utils/generateMSCSEmail");
 
-const recoverySubject = "BICCSL - Password Recovery";
-const resetPasswordSubject =  "BICCSL - OTP Verification";
+const recoverySubject = "MSCS - Password Recovery";
+const resetPasswordSubject =  "MSCS - OTP Verification";
 
 const generateUniqueMemberId = async () => {
   while (true) {
-    const memberId = `BIC${Math.floor(100000 + Math.random() * 900000)}`;
+    const memberId = `MSCS${Math.floor(100000 + Math.random() * 900000)}`;
     if (!(await MemberModel.exists({ Member_id: memberId }))) {
       return memberId;
     }
@@ -22,10 +22,10 @@ const generateUniqueMemberId = async () => {
 const signup = async (req, res) => {
   try {
     const { email, password, Name, ...otherDetails } = req.body;
-    const existingUser = await MemberModel.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ success: false, message: "Email already in use" });
-    }
+    // const existingUser = await MemberModel.findOne({ email });
+    // if (existingUser) {
+    //   return res.status(400).json({ success: false, message: "Email already in use" });
+    // }
 
     const memberId = await generateUniqueMemberId();
 
@@ -95,7 +95,7 @@ const recoverPassword = async (req, res) => {
       .status(404)
       .json({ success: false, message: "Email not registered" });
     }
-    const recoveryDescription = `Dear Member,\n\nYou requested a password recovery. Here is your password:\n ${user.password}\n\nPlease keep this information secure.\n\nBest regards,\nBICCSL Team`;
+    const recoveryDescription = `Dear Member,\n\nYou requested a password recovery. Here is your password:\n ${user.password}\n\nPlease keep this information secure.\n\nBest regards,\nMSCS Team`;
 
     await sendMail(user.email, recoverySubject, recoveryDescription);
     res.json({ success: true, message: "Password sent to your email" });

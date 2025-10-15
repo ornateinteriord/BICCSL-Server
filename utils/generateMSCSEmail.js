@@ -11,13 +11,13 @@ const generateMSCSEmail = (memberId, password, name = 'Member') => {
         </p>
 
         <p style="color: #374151; margin-bottom: 20px;">
-          Your account registration with <strong>MSCS</strong> has been successfully completed.
+          Your account registration with <strong>Manipal Society</strong> has been successfully completed.
         </p>
 
         <!-- Credentials Box -->
         <div style="background: #f8f7ff; border-left: 4px solid #7e22ce; padding: 20px; margin: 25px 0; border-radius: 4px;">
           <h3 style="color: #581c87; margin-top: 0; margin-bottom: 15px;">Your Login Credentials:</h3>
-          <p style="margin: 8px 0;"><strong style="color: #7e22ce;">Member ID:</strong> ${memberId}</p>
+          <p style="margin: 8px 0;"><strong style="color: #7e22ce;">Username:</strong> ${memberId}</p>
           <p style="margin: 8px 0;"><strong style="color: #7e22ce;">Password:</strong> ${password}</p>
         </div>
 
@@ -28,7 +28,7 @@ const generateMSCSEmail = (memberId, password, name = 'Member') => {
         <!-- Footer -->
         <div style="border-top: 2px solid #f3f4f6; padding-top: 25px; margin-top: 25px;">
           <p style="color: #6b7280; margin-bottom: 5px;">Best regards,</p>
-          <p style="color: #7e22ce; font-weight: bold; margin: 0;">MSCS Team</p>
+          <p style="color: #7e22ce; font-weight: bold; margin: 0;">Manipal Society Team</p>
         </div>
       </div>
     </div>

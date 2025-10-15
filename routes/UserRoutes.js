@@ -10,6 +10,8 @@ const { getMultiLevelSponsorship } = require("../controllers/Users/Sponser/multi
 const { createTicket, getTickets } = require("../controllers/Users/Ticket/TicketConntroller");
 const Authenticated = require("../middlewares/auth");
 const { getWalletWithdraw, getWalletOverview } = require("../controllers/Users/walletServiece.js/walletServies");
+const { getLevelBenefits, getDailyPayout } = require("../controllers/Users/Payout/PayoutController");
+const { getPendingTransactions, approveWithdrawal } = require("../controllers/Users/payoutPending/pendingTransactions");
 
 
 const router = require("express").Router();
@@ -28,5 +30,11 @@ router.get('/multi-level-sponsors',Authenticated,getMultiLevelSponsorship)
 router.get("/overview/:memberId",Authenticated, getWalletOverview);
 router.post("/withdraw", Authenticated,getWalletWithdraw);
 router.put("/activate-package/:memberId",Authenticated, activateMemberPackage);
+router.get("/level-benefits/:member_id", getLevelBenefits);
+router.get("/daily/:member_id", getDailyPayout);
+router.get("/trasactions/:status", /* authenticateToken, authorizeRoles(['admin']), */ getPendingTransactions);
+router.put('/approve-withdrawal/:member_id', approveWithdrawal);
+
+
 
 module.exports = router;

@@ -9,7 +9,19 @@ const TransactionSchema = new mongoose.Schema(
     transaction_type: { type: String },
     ew_credit: { type: String },
     ew_debit: { type: String },
-    status: { type: String },
+  status: {
+    type: String,
+    enum: {
+      values: ['active', 'Completed', 'Pending'],
+    },
+    default: 'Pending'
+  },
+
+    deduction: { type: String }, 
+    net_amount: { type: String },
+    withdrawal_amount: { type: String }, 
+    benefit_type: { type: String, default: "direct" }, 
+    previous_balance: { type: String } 
   },
   { timestamps: true, collection: "transaction_tbl" }
 );

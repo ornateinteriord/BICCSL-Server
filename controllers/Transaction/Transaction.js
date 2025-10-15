@@ -17,9 +17,14 @@ const getTransactionDetails = async (req, res) => {
 
     const transactions = await TransactionModel.find(query);
 
-    if (!transactions.length) {
-      return res.status(404).json({ success: false, message: "No transactions found" });
-    }
+   if (!transactions.length) {
+  return res.status(200).json({
+    success: true,
+    message: "No transactions found",
+    transactions: [],
+  });
+}
+
 
     return res.status(200).json({ success: true, data: transactions });
   } catch (error) {

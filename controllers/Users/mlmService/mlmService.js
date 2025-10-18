@@ -304,6 +304,86 @@ const getCommissionSummary = () => {
   };
 };
 
+// ✅ PROCESS MEMBER ACTIVATION
+const processMemberActivation = async (activatedMemberId) => {
+  try {
+    console.log(`🔔 Processing activation for member: ${activatedMemberId}`);
+
+    const member = await MemberModel.findOne({ Member_id: activatedMemberId });
+    if (!member) {
+      console.log(`❌ Activated member not found: ${activatedMemberId}`);
+      return { success: false, message: "Member not found" };
+    }
+
+    // Find sponsor by Sponsor_code (fallback to sponsor_id)
+    let sponsor = null;
+    if (member.sponsor_id) {
+      sponsor = await MemberModel.findOne({ Member_id: member.sponsor_id });
+    }
+
+    if (!sponsor) {
+      console.log(`⚠️ Sponsor not found for member ${activatedMemberId} (Sponsor_code: ${member.Sponsor_code})`);
+      return { success: false, message: "Sponsor not found" };
+    }
+
+    // Only give the referral payout if sponsor is active
+    if (sponsor.status !== "active") {
+      console.log(`⏸️ Sponsor ${sponsor.Member_id} inactive; skipping payout.`);
+      // Still update sponsor referrals/team if needed
+      await updateSponsorReferrals(sponsor.Member_id, member.Member_id).catch(e => console.error(e));
+      return { success: false, message: "Sponsor not active; payout skipped" };
+    }
+
+    // Use level-1 commission rate (fallback to 0)
+    const amount = commissionRates[1] || 0;
+    if (amount <= 0) {
+      return { success: false, message: "No commission configured for level 1" };
+    }
+
+    const payoutId = Date.now() + Math.floor(Math.random() * 1000) + 1;
+
+    const payout = new PayoutModel({
+      payout_id: payoutId,
+      date: new Date().toISOString().split("T")[0],
+      memberId: sponsor.Member_id,
+      payout_type: `1st Level Benefits`,
+      ref_no: member.Member_id,
+      amount: amount,
+      level: 1,
+      sponsored_member_id: member.Member_id,
+      sponsor_id: sponsor.Member_id,
+      status: "Completed",
+      description: `Direct referral commission from ${member.Member_id}`
+    });
+
+    await payout.save();
+
+    const transaction = await createLevelBenefitsTransaction({
+      payout_id: payoutId,
+      memberId: sponsor.Member_id,
+      payout_type: payout.payout_type,
+      amount: amount,
+      level: 1,
+      new_member_id: member.Member_id
+    });
+
+    // Update sponsor's direct referrals / team counts
+    await updateSponsorReferrals(sponsor.Member_id, member.Member_id);
+
+    console.log(`✅ Created direct referral payout/txn for sponsor ${sponsor.Member_id} from ${member.Member_id}: ₹${amount}`);
+
+    return {
+      success: true,
+      payout,
+      transaction
+    };
+
+  } catch (error) {
+    console.error("❌ Error in processMemberActivation:", error);
+    throw error;
+  }
+};
+
 // ✅ EXPORT ALL FUNCTIONS
 module.exports = {
   commissionRates,
@@ -314,5 +394,6 @@ module.exports = {
   calculateCommissions,
   processCommissions,
   getUplineTree,
-  getCommissionSummary
+  getCommissionSummary,
+  processMemberActivation
 };

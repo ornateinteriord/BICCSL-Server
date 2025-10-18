@@ -34,6 +34,7 @@ const signup = async (req, res) => {
       email,
       password,
       Name,
+      
       ...otherDetails,
     });
     await newMember.save();

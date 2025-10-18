@@ -1,6 +1,7 @@
 const MemberModel = require("../../../models/Users/Member");
 const mongoose = require("mongoose");
 const AdminModel = require("../../../models/Admin/Admin");
+const mlmService = require("../mlmService/mlmService");
 
 const getMemberDetails = async (req, res) => {
   try {
@@ -170,9 +171,56 @@ const UpdateMemberDetails = async (req, res) => {
     });
   }
 };
-const updateMemberStatus = (req, res) => {
-  const { memberId } = req.params
+const updateMemberStatus = async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const { status } = req.body;
 
-}
+    if (!status) {
+      return res.status(400).json({ success: false, message: "Status is required in body" });
+    }
+
+    let query;
+    if (mongoose.Types.ObjectId.isValid(memberId)) {
+      query = { _id: memberId };
+    } else {
+      query = { Member_id: memberId };
+    }
+
+    const existingMember = await MemberModel.findOne(query);
+    if (!existingMember) {
+      return res.status(404).json({ success: false, message: "Member not found" });
+    }
+
+    const oldStatus = existingMember.status;
+    const updatedMember = await MemberModel.findOneAndUpdate(query, { status }, { new: true });
+
+    // If status changed to active (from anything else) trigger MLM activation flow
+    if (oldStatus !== "active" && status === "active") {
+      try {
+        const result = await mlmService.processMemberActivation(updatedMember.Member_id);
+        return res.status(200).json({
+          success: true,
+          message: "Member status updated to active",
+          data: updatedMember,
+          mlmResult: result
+        });
+      } catch (err) {
+        // return success for status update but report mlm error
+        return res.status(200).json({
+          success: true,
+          message: "Member status updated to active (MLM processing failed)",
+          data: updatedMember,
+          mlmError: err.message
+        });
+      }
+    }
+
+    return res.status(200).json({ success: true, message: "Member status updated", data: updatedMember });
+  } catch (error) {
+    console.error("Error updating member status:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
 module.exports = { getMemberDetails, UpdateMemberDetails,getMember ,activateMemberPackage, updateMemberStatus};

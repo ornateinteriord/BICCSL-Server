@@ -22,7 +22,7 @@ const router = express.Router();
 
 router.get("/member/:id", Authenticated, getMemberDetails);
 router.put("/member/:memberId", Authenticated, UpdateMemberDetails);
-router.put("/activate-package/:memberId", Authenticated, activateMemberPackage);
+router.put("/activate-package/:memberId", activateMemberPackage);
 
 
 router.get("/transactions", Authenticated, getTransactionDetails);

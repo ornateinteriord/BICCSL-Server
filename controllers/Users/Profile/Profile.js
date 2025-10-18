@@ -170,5 +170,9 @@ const UpdateMemberDetails = async (req, res) => {
     });
   }
 };
+const updateMemberStatus = (req, res) => {
+  const { memberId } = req.params
 
-module.exports = { getMemberDetails, UpdateMemberDetails,getMember ,activateMemberPackage};
+}
+
+module.exports = { getMemberDetails, UpdateMemberDetails,getMember ,activateMemberPackage, updateMemberStatus};

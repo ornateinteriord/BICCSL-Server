@@ -11,8 +11,12 @@ const payoutSchema = new mongoose.Schema(
     count: Number,
     days: Number,
     status: String,
+    level: { type: Number }, 
+    sponsored_member_id: { type: String }, 
+    sponsor_id: { type: String },
+    description: { type: String }
   },
-  { timestamps: true,  collection: "payouts" }
+  { timestamps: true, collection: "payouts" }
 );
 
 const PayoutModel = mongoose.model("Payout", payoutSchema);

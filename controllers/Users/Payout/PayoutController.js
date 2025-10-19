@@ -1,6 +1,5 @@
 const PayoutModel = require("../../../models/Payout/Payout");
 const TransactionModel = require("../../../models/Transaction/Transaction");
-const MemberModel = require("../../../models/Users/Member");
 const {
   updateSponsorReferrals,
   calculateCommissions,
@@ -282,9 +281,80 @@ const getMemberPayouts = async (req, res) => {
   }
 };
 
+
+
+const getDailyPayout = async (req, res) => {
+  try {
+    const { member_id } = req.params;
+
+    const transactions = await TransactionModel.find({
+      member_id: member_id,
+      $or: [
+        { transaction_type: /level benefits|direct benefits/i },
+        { description: /level benefits|direct benefits/i }
+      ]
+    }).sort({ createdAt: 1 });
+
+    const dailyEarnings = {};
+    
+    transactions.forEach(tx => {
+      const date = tx.createdAt.toDateString();
+      
+      if (!dailyEarnings[date]) {
+        dailyEarnings[date] = {
+          date,
+          level_benefits: 0,
+          direct_benefits: 0,
+          transactions: []
+        };
+      }
+
+      const amount = parseFloat(tx.ew_credit) || 0;
+      
+      if (tx.transaction_type?.toLowerCase().includes('level') || 
+          tx.description?.toLowerCase().includes('level')) {
+        dailyEarnings[date].level_benefits += amount;
+      } else {
+        dailyEarnings[date].direct_benefits += amount;
+      }
+
+      dailyEarnings[date].transactions.push({
+        type: tx.transaction_type || tx.description,
+        amount: tx.ew_credit,
+        time: tx.createdAt,
+        status: tx.status
+      });
+    });
+
+    const result = Object.values(dailyEarnings).map(day => ({
+      ...day,
+      gross_profit: (day.level_benefits + day.direct_benefits).toFixed(2),
+      level_benefits: day.level_benefits.toFixed(2),
+      direct_benefits: day.direct_benefits.toFixed(2)
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        member_id,
+        daily_earnings: result
+      }
+    });
+
+  } catch (error) {
+    console.error("Error in getDailyPayout:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   triggerMLMCommissions,
   getMemberCommissionSummary,
   getUplineTree,
   getMemberPayouts,
+  getDailyPayout
 };

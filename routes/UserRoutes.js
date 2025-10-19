@@ -10,7 +10,7 @@ const { getSponsers, checkSponsorReward } = require("../controllers/Users/Sponse
 const { getMultiLevelSponsorship } = require("../controllers/Users/Sponser/multiLevelSponsorship");
 const { createTicket, getTickets } = require("../controllers/Users/Ticket/TicketConntroller");
 const Authenticated = require("../middlewares/auth");
-const {  triggerMLMCommissions, getMemberCommissionSummary, getMemberPayouts } = require("../controllers/Users/Payout/PayoutController");
+const {  triggerMLMCommissions, getMemberCommissionSummary, getMemberPayouts, getDailyPayout } = require("../controllers/Users/Payout/PayoutController");
 const { getPendingTransactions, approveWithdrawal } = require("../controllers/Users/payoutPending/pendingTransactions");
 const { getWalletOverview, getWalletWithdraw } = require("../controllers/Users/walletServiece/walletServies");
 const { getUplineTree } = require("../controllers/Users/mlmService/mlmService");
@@ -48,11 +48,11 @@ router.get("/mlm/payouts/:memberId", Authenticated, getMemberPayouts);
 
 
 router.get("/overview/:memberId", Authenticated, getWalletOverview);
-router.get("/withdraw/:memberId", Authenticated, getWalletWithdraw);
+router.post("/withdraw/:memberId", Authenticated, getWalletWithdraw);
 router.put('/approve-withdrawal/:member_id', Authenticated, approveWithdrawal);
 
 
 // router.get("/level-benefits/:member_id", getLevelBenefits);
-// router.get("/daily/:member_id", getDailyPayout);
+router.get("/daily/:member_id", getDailyPayout);
 
 module.exports = router;

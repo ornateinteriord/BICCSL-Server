@@ -29,6 +29,7 @@ const getMemberDetails = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
+// ...existing code...
 const activateMemberPackage = async (req, res) => {
   try {
     const { memberId } = req.params;
@@ -39,6 +40,17 @@ const activateMemberPackage = async (req, res) => {
     } else {
       query = { Member_id: memberId };
     }
+
+    // Fetch existing member to detect status change
+    const existingMember = await MemberModel.findOne(query);
+    if (!existingMember) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Member not found" 
+      });
+    }
+
+    const oldStatus = existingMember.status;
 
     const updatedMember = await MemberModel.findOneAndUpdate(
       query,
@@ -57,6 +69,26 @@ const activateMemberPackage = async (req, res) => {
       });
     }
 
+    // Trigger MLM activation flow only when status changed to active
+    if (oldStatus !== "active" && updatedMember.status === "active") {
+      try {
+        const mlmResult = await mlmService.processMemberActivation(updatedMember.Member_id);
+        return res.status(200).json({ 
+          success: true, 
+          data: updatedMember,
+          message: "Package activated successfully",
+          mlmResult
+        });
+      } catch (mlmError) {
+        // Return success for activation but include MLM error detail
+        return res.status(200).json({ 
+          success: true, 
+          data: updatedMember,
+          mlmError: mlmError.message
+        });
+      }
+    }
+
     return res.status(200).json({ 
       success: true, 
       data: updatedMember,
@@ -71,6 +103,7 @@ const activateMemberPackage = async (req, res) => {
     });
   }
 };
+// ...existing code...
 const getMember = async(req,res)=>{
   try {
     if(req.user.role !== "ADMIN"){

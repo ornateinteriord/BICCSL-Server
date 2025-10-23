@@ -29,7 +29,7 @@ const getMemberDetails = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
-// ...existing code...
+
 const activateMemberPackage = async (req, res) => {
   try {
     const { memberId } = req.params;
@@ -103,7 +103,7 @@ const activateMemberPackage = async (req, res) => {
     });
   }
 };
-// ...existing code...
+
 const getMember = async(req,res)=>{
   try {
     if(req.user.role !== "ADMIN"){

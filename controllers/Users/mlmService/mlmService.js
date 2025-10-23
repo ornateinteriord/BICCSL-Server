@@ -40,9 +40,9 @@ const findUplineSponsors = async (memberId, maxLevels = 10) => {
         level: level,
         sponsor_id: sponsor.Member_id,
         Sponsor_code: sponsor.member_code, 
-        sponsor_name: sponsor.Name, // ✅ Use Name field
+        sponsor_name: sponsor.Name,
         sponsored_member_id: currentMemberId,
-        sponsor_status: sponsor.status // ✅ Include status for checking
+        sponsor_status: sponsor.status 
       });
       
       currentMemberId = sponsor.Member_id;
@@ -51,28 +51,24 @@ const findUplineSponsors = async (memberId, maxLevels = 10) => {
     }
   }
 
-  console.log(`🔍 Found ${uplineSponsors.length} upline sponsors for ${memberId}`);
   return uplineSponsors;
 };
 
 const calculateCommissions = async (newMemberId, sponsorId) => {
   try {
-    console.log(`🎯 Calculating commissions for new member: ${newMemberId}, sponsored by: ${sponsorId}`);
 
     const uplineSponsors = await findUplineSponsors(newMemberId, 10);
     
     if (uplineSponsors.length === 0) {
-      console.log("❌ No upline sponsors found");
       return [];
     }
 
     const commissions = [];
     
     for (const upline of uplineSponsors) {
-      // ✅ CHECK IF SPONSOR STATUS IS 'active' (lowercase as per your schema)
       if (upline.sponsor_status !== 'active') {
-        console.log(`⏸️ Skipping level ${upline.level} - Sponsor ${upline.sponsor_id} status: ${upline.sponsor_status}`);
-        continue; // Skip inactive sponsors
+    
+        continue;
       }
 
       const commissionAmount = commissionRates[upline.level] || 0;
@@ -87,22 +83,17 @@ const calculateCommissions = async (newMemberId, sponsorId) => {
           new_member_id: newMemberId,
           amount: commissionAmount,
           payout_type: `${getOrdinal(upline.level)} Level Benefits`,
-          description: `Level ${upline.level} commission from ${newMemberId}`,
+          description: `Level ${upline.level}`,
           sponsor_status: upline.sponsor_status // ✅ Include status
         });
       }
     }
 
-    console.log(`💰 Generated ${commissions.length} commission records for 10 levels (₹25 each)`);
-    
-    commissions.forEach(comm => {
-      console.log(`   Level ${comm.level}: ${comm.sponsor_id} (${comm.Sponsor_code}) → ₹${comm.amount} (Status: ${comm.sponsor_status})`);
-    });
+  
 
     return commissions;
 
   } catch (error) {
-    console.error("❌ Error calculating commissions:", error);
     throw error;
   }
 };
@@ -118,7 +109,6 @@ const processCommissions = async (commissions) => {
         const sponsor = await MemberModel.findOne({ Member_id: commission.sponsor_id });
         
         if (!sponsor || sponsor.status !== 'active') {
-          console.log(`⏸️ Commission skipped - Sponsor ${commission.sponsor_id} is not active (Status: ${sponsor?.status || 'not found'})`);
           results.push({
             success: false,
             level: commission.level,
@@ -169,10 +159,9 @@ const processCommissions = async (commissions) => {
           transaction: transaction
         });
 
-        console.log(`✅ Level ${commission.level} commission processed for ${commission.sponsor_id} (${commission.Sponsor_code}): ₹${commission.amount} (Status: ${commission.sponsor_status})`);
+  
 
       } catch (error) {
-        console.error(`❌ Error processing commission for ${commission.sponsor_id}:`, error);
         results.push({
           success: false,
           level: commission.level,
@@ -185,7 +174,6 @@ const processCommissions = async (commissions) => {
     return results;
 
   } catch (error) {
-    console.error("❌ Error processing commissions:", error);
     throw error;
   }
 };
@@ -203,11 +191,11 @@ const createLevelBenefitsTransaction = async (transactionData) => {
     }
 
     const transaction = new TransactionModel({
-      transaction_id: `TXN${newTransactionId.toString().padStart(6, '0')}`,
+      transaction_id: newTransactionId.toString(),
       transaction_date: new Date(),
       member_id: memberId,
       reference_no: payout_id.toString(),
-      description: `${payout_type} - From member ${new_member_id}`,
+      description: payout_type,
       transaction_type: "Level Benefits",
       ew_credit: amount,
       ew_debit: 0,
@@ -221,7 +209,6 @@ const createLevelBenefitsTransaction = async (transactionData) => {
     return transaction;
 
   } catch (error) {
-    console.error("❌ Error creating level benefits transaction:", error);
     throw error;
   }
 };
@@ -244,9 +231,9 @@ const updateSponsorReferrals = async (sponsorId, newMemberId) => {
         $inc: { total_team: 1 }
       }
     );
-    console.log(`✅ Updated referrals for sponsor: ${sponsorId}`);
+
   } catch (error) {
-    console.error("❌ Error updating sponsor referrals:", error);
+ 
     throw error;
   }
 };
@@ -273,11 +260,11 @@ const getUplineTree = async (memberId, maxLevels = 10) => {
           member_id: sponsor.Member_id,
           name: sponsor.Name,
           member_code: sponsor.member_code,
-          status: sponsor.status, // ✅ Include status
+          status: sponsor.status, 
           direct_referrals: sponsor.direct_referrals || [],
           total_team: sponsor.total_team || 0,
           commission_rate: commissionRates[level],
-          eligible: sponsor.status === 'active' // ✅ Show eligibility
+          eligible: sponsor.status === 'active'
         });
         
         currentMemberId = sponsor.Member_id;
@@ -288,7 +275,7 @@ const getUplineTree = async (memberId, maxLevels = 10) => {
 
     return tree;
   } catch (error) {
-    console.error("Error getting upline tree:", error);
+
     throw error;
   }
 };

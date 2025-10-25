@@ -3,6 +3,7 @@ const { getNews, addNews } = require("../controllers/Admin/News/NewsController")
 const UpdatePassword = require("../controllers/Admin/UpdatePassword");
 const getTransactionDetails = require("../controllers/Transaction/Transaction");
 const { getEpinsSummary, generatePackage } = require("../controllers/Users/Epin/epin");
+const { getDailyPayout } = require("../controllers/Users/Payout/PayoutController");
 const { getMemberDetails, UpdateMemberDetails, getMember, updateMemberStatus } = require("../controllers/Users/Profile/Profile");
 const { editTicket, getTickets } = require("../controllers/Users/Ticket/TicketConntroller");
 const Authenticated = require("../middlewares/auth");
@@ -24,6 +25,6 @@ router.get('/getholiday',Authenticated,authorizeRoles("ADMIN"),getHoliday)
 router.post('/addholiday',Authenticated,authorizeRoles("ADMIN"),addHoliday)
 router.post('/generate-package',Authenticated,authorizeRoles("ADMIN"),generatePackage)
 router.put('/update-status/:memberId',updateMemberStatus)
- 
+ router.get('/all-daily-payouts',Authenticated, authorizeRoles("ADMIN"),getDailyPayout)
 
 module.exports = router;

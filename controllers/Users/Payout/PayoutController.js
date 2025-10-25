@@ -285,60 +285,84 @@ const getMemberPayouts = async (req, res) => {
 
 const getDailyPayout = async (req, res) => {
   try {
-    const { member_id } = req.params;
+    const userRole = req.user.role; 
+    const loggedInMemberId = req.user.member_id;
+    const { member_id } = req.params; 
 
+    let query = {};
+
+    // 🔹 Role-based data access
+    if (userRole === "ADMIN") {
+      // Admin can see all payouts, or a specific member if member_id is passed
+      query = member_id ? { member_id } : {};
+    } else if (userRole === "USER") {
+      // Users can see only their own payouts
+      query = { member_id: loggedInMemberId };
+    }
+
+    // 🔹 Fetch transactions based on role
     const transactions = await TransactionModel.find({
-      member_id: member_id,
+      ...query,
       $or: [
         { transaction_type: /level benefits|direct benefits/i },
-        { description: /level benefits|direct benefits/i }
-      ]
+        { description: /level benefits|direct benefits/i },
+      ],
     }).sort({ createdAt: 1 });
 
+    if (!transactions.length) {
+      return res.status(200).json({
+        success: true,
+        data: { daily_earnings: [] },
+        message: "No transactions found",
+      });
+    }
+
+    // 🔹 Group by date
     const dailyEarnings = {};
-    
+
     transactions.forEach(tx => {
       const date = tx.createdAt.toDateString();
-      
-      if (!dailyEarnings[date]) {
-        dailyEarnings[date] = {
+      const memberId = tx.member_id;
+
+      if (!dailyEarnings[memberId]) dailyEarnings[memberId] = {};
+      if (!dailyEarnings[memberId][date]) {
+        dailyEarnings[memberId][date] = {
+          member_id: memberId,
           date,
           level_benefits: 0,
           direct_benefits: 0,
-          transactions: []
+          transactions: [],
         };
       }
 
       const amount = parseFloat(tx.ew_credit) || 0;
-      
-      if (tx.transaction_type?.toLowerCase().includes('level') || 
-          tx.description?.toLowerCase().includes('level')) {
-        dailyEarnings[date].level_benefits += amount;
+      if (tx.transaction_type?.toLowerCase().includes("level") || tx.description?.toLowerCase().includes("level")) {
+        dailyEarnings[memberId][date].level_benefits += amount;
       } else {
-        dailyEarnings[date].direct_benefits += amount;
+        dailyEarnings[memberId][date].direct_benefits += amount;
       }
 
-      dailyEarnings[date].transactions.push({
+      dailyEarnings[memberId][date].transactions.push({
         type: tx.transaction_type || tx.description,
         amount: tx.ew_credit,
         time: tx.createdAt,
-        status: tx.status
+        status: tx.status,
       });
     });
 
-    const result = Object.values(dailyEarnings).map(day => ({
-      ...day,
-      gross_profit: (day.level_benefits + day.direct_benefits).toFixed(2),
-      level_benefits: day.level_benefits.toFixed(2),
-      direct_benefits: day.direct_benefits.toFixed(2)
-    }));
+    // 🔹 Flatten for easy consumption
+    const result = Object.values(dailyEarnings).flatMap(memberDays =>
+      Object.values(memberDays).map(day => ({
+        ...day,
+        gross_profit: (day.level_benefits + day.direct_benefits).toFixed(2),
+        level_benefits: day.level_benefits.toFixed(2),
+        direct_benefits: day.direct_benefits.toFixed(2),
+      }))
+    );
 
     return res.status(200).json({
       success: true,
-      data: {
-        member_id,
-        daily_earnings: result
-      }
+      data: { daily_earnings: result },
     });
 
   } catch (error) {
@@ -346,10 +370,11 @@ const getDailyPayout = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server error",
-      error: error.message
+      error: error.message,
     });
   }
 };
+
 
 module.exports = {
   triggerMLMCommissions,

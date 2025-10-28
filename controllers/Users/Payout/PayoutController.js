@@ -1,5 +1,6 @@
 const PayoutModel = require("../../../models/Payout/Payout");
 const TransactionModel = require("../../../models/Transaction/Transaction");
+const MemberModel = require("../../../models/Users/Member");
 const {
   updateSponsorReferrals,
   calculateCommissions,
@@ -289,6 +290,10 @@ const getDailyPayout = async (req, res) => {
     const loggedInMemberId = req.user.member_id;
     const { member_id } = req.params; 
 
+    console.log("User Role:",userRole);
+    console.log("Requested Member ID:",member_id);
+
+
     let query = {};
 
     // 🔹 Role-based data access
@@ -297,7 +302,7 @@ const getDailyPayout = async (req, res) => {
       query = member_id ? { member_id } : {};
     } else if (userRole === "USER") {
       // Users can see only their own payouts
-      query = { member_id: loggedInMemberId };
+      query = { member_id: member_id  };
     }
 
     // 🔹 Fetch transactions based on role
@@ -376,10 +381,200 @@ const getDailyPayout = async (req, res) => {
 };
 
 
+
+const climeRewardLoan = async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const { amount, note } = req.body;
+
+    // Validate request
+    if (!memberId || !amount || isNaN(amount) || Number(amount) <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid memberId and loan amount are required.",
+      });
+    }
+
+    // Find member
+    const member = await MemberModel.findOne({ Member_id: memberId });
+    if (!member) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Member not found" });
+    }
+
+    // Prevent duplicate pending/processing claims
+    if (member.upgrade_status === "Processing") {
+      return res.status(400).json({
+        success: false,
+        message: `Loan claim already in status: ${member.upgrade_status}. Please wait for admin review.`,
+      });
+    }
+
+    // Mark as pending
+    member.upgrade_status = "Processing";
+    await member.save();
+
+    // Create transaction
+    const tx = new TransactionModel({
+      transaction_id: `RL-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      transaction_date: new Date().toISOString(),
+      member_id: member.Member_id,
+      description: `Reward loan request of ₹${amount}${note ? ` - ${note}` : ""}`,
+      transaction_type: "Reward Loan Request",
+      ew_credit: amount, 
+      ew_debit: "0",
+      status: "Processing",
+      net_amount: amount,
+      benefit_type: "loan",
+      previous_balance: "",
+      reference_no: `RLREF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      // ADD THIS LINE - Set the amount field
+      amount: amount
+    });
+
+    await tx.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Reward loan claimed successfully. Status set to Pending. Admin will process the request.",
+      data: {
+        member_id: member.Member_id,
+        status: member.upgrade_status,
+        requested_amount: amount,
+        transaction_ref: tx.reference_no,
+      },
+    });
+  } catch (error) {
+    console.error("Error in climeRewardLoan:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Server error", error: error.message });
+  }
+};
+// controllers/adminController.js
+
+// GET - Get pending reward loans
+const getPendingRewardLoans = async (req, res) => {
+  try {
+    const pendingLoans = await TransactionModel.find({
+      transaction_type: "Reward Loan Request",
+      status: "Processing" // Change from "Pending" to "Processing"
+    })
+    .sort({ transaction_date: -1 });
+
+    const totalCount = await TransactionModel.countDocuments({
+      transaction_type: "Reward Loan Request",
+      status: "Processing" // Change from "Pending" to "Processing"
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        pendingLoans,
+        totalCount
+      },
+    });
+  } catch (error) {
+    console.error("Error in getPendingRewardLoans:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: "Server error" 
+    });
+  }
+};
+
+
+const approveRejectRewardLoan = async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const { action, adminNotes, approvedBy } = req.body;
+
+    if (!memberId || !action || !approvedBy) {
+      return res.status(400).json({
+        success: false,
+        message: "Member ID, action, and approved by are required.",
+      });
+    }
+
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid action. Use 'approve' or 'reject'.",
+      });
+    }
+
+
+    const transaction = await TransactionModel.findOne({
+      member_id: memberId,
+      transaction_type: "Reward Loan Request",
+      status: "Processing"
+    }).sort({ transaction_date: -1 });
+
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        message: "No pending reward loan found for this member.",
+      });
+    }
+
+    const member = await MemberModel.findOne({ Member_id: memberId });
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: "Member not found.",
+      });
+    }
+
+    const now = new Date().toISOString();
+    
+    if (action === 'approve') {
+      transaction.status = "Approved";
+      transaction.ew_credit = transaction.amount;
+      transaction.net_amount = transaction.amount;
+      member.wallet_balance = (parseFloat(member.wallet_balance) || 0) + parseFloat(transaction.amount);
+      member.upgrade_status = "Approved";
+    } else {
+      transaction.status = "Rejected";
+      member.upgrade_status = "Rejected";
+    }
+
+    transaction.admin_notes = adminNotes || `Loan ${action}ed by admin`;
+    transaction.approved_by = approvedBy;
+    transaction.approved_at = now;
+
+    await Promise.all([member.save(), transaction.save()]);
+
+    return res.status(200).json({
+      success: true,
+      message: `Reward loan ${action}ed successfully.`,
+      data: {
+        member_id: member.Member_id,
+        member_name: member.Name,
+        status: transaction.status,
+        amount: transaction.amount,
+        ...(action === 'approve' && { 
+          new_wallet_balance: member.wallet_balance 
+        })
+      },
+    });
+
+  } catch (error) {
+    console.error("Error in approveRejectRewardLoan:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: "Server error" 
+    });
+  }
+};
+
 module.exports = {
   triggerMLMCommissions,
   getMemberCommissionSummary,
   getUplineTree,
   getMemberPayouts,
-  getDailyPayout
+  getDailyPayout,
+  climeRewardLoan,
+  getPendingRewardLoans,
+  approveRejectRewardLoan
 };

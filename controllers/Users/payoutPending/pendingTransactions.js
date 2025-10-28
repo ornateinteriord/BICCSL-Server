@@ -53,7 +53,7 @@ const approveWithdrawal = async (req, res) => {
     
     // Find pending withdrawal transaction for this member
     const transaction = await TransactionModel.findOne({           // Match member ID
-      status: 'Pending',             // Only pending transactions
+    status: { $in: ['Pending', 'Processing'] }// Only pending transactions
     }).sort({ createdAt: -1 });     // Get the most recent one
 
     if (!transaction) {

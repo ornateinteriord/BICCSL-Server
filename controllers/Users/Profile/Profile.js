@@ -33,7 +33,8 @@ const getMemberDetails = async (req, res) => {
 const activateMemberPackage = async (req, res) => {
   try {
     const { memberId } = req.params;
-    
+    const { packageType } = req.body; // 👈 new: get package type from frontend (e.g., "standard" or "RD")
+
     let query;
     if (mongoose.Types.ObjectId.isValid(memberId)) {
       query = { _id: memberId };
@@ -41,7 +42,7 @@ const activateMemberPackage = async (req, res) => {
       query = { Member_id: memberId };
     }
 
-    // Fetch existing member to detect status change
+    // Fetch existing member
     const existingMember = await MemberModel.findOne(query);
     if (!existingMember) {
       return res.status(404).json({ 
@@ -52,14 +53,24 @@ const activateMemberPackage = async (req, res) => {
 
     const oldStatus = existingMember.status;
 
+    // Define available packages
+    const packages = {
+      standard: { name: "standard", value: 2600 },
+      RD: { name: "RD", value: 1000 },
+    };
+
+    // Validate selected package
+    const selectedPackage = packages[packageType] || packages.standard;
+
+    // Update member
     const updatedMember = await MemberModel.findOneAndUpdate(
       query,
       {
         status: 'active',
-        spackage: 'standard', 
-        package_value: 2600
+        spackage: selectedPackage.name,
+        package_value: selectedPackage.value,
       },
-      { new: true } 
+      { new: true }
     );
 
     if (!updatedMember) {
@@ -69,40 +80,41 @@ const activateMemberPackage = async (req, res) => {
       });
     }
 
-    // Trigger MLM activation flow only when status changed to active
+    // MLM activation only when status changes
     if (oldStatus !== "active" && updatedMember.status === "active") {
       try {
         const mlmResult = await mlmService.processMemberActivation(updatedMember.Member_id);
-        return res.status(200).json({ 
-          success: true, 
+        return res.status(200).json({
+          success: true,
           data: updatedMember,
-          message: "Package activated successfully",
-          mlmResult
+          message: `${selectedPackage.name} package activated successfully`,
+          mlmResult,
         });
       } catch (mlmError) {
-        // Return success for activation but include MLM error detail
-        return res.status(200).json({ 
-          success: true, 
+        return res.status(200).json({
+          success: true,
           data: updatedMember,
-          mlmError: mlmError.message
+          message: `${selectedPackage.name} package activated successfully (MLM process error)`,
+          mlmError: mlmError.message,
         });
       }
     }
 
-    return res.status(200).json({ 
-      success: true, 
+    return res.status(200).json({
+      success: true,
       data: updatedMember,
-      message: "Package activated successfully" 
+      message: `${selectedPackage.name} package activated successfully`,
     });
 
   } catch (error) {
     console.error("Error activating package:", error);
-    return res.status(500).json({ 
-      success: false, 
-      message: "Server error" 
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
     });
   }
 };
+
 
 const getMember = async(req,res)=>{
   try {

@@ -39,7 +39,10 @@ const MemberSchema = new mongoose.Schema(
     member_code: { type: String },
     roi_status: { type: String },
     upgrade_package: { type: String },
-    upgrade_status: { type: String },
+    upgrade_status: { type: String,
+      enum: [ "Pending", "Processing", "Completed", "Rejected"], 
+      default: "Pending"
+     },
     level_eligible: { type: String },
     TBPDays: { type: String },
     level_income: { type: String },

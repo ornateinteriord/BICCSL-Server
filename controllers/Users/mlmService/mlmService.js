@@ -3,7 +3,7 @@ const PayoutModel = require("../../../models/Payout/Payout");
 const TransactionModel = require("../../../models/Transaction/Transaction");
 
 const commissionRates = {
-  1: 25,
+  1: 100,
   2: 25,
   3: 25,
   4: 25,

@@ -10,10 +10,11 @@ const { getSponsers, checkSponsorReward } = require("../controllers/Users/Sponse
 const { getMultiLevelSponsorship } = require("../controllers/Users/Sponser/multiLevelSponsorship");
 const { createTicket, getTickets } = require("../controllers/Users/Ticket/TicketConntroller");
 const Authenticated = require("../middlewares/auth");
-const {  triggerMLMCommissions, getMemberCommissionSummary, getMemberPayouts, getDailyPayout } = require("../controllers/Users/Payout/PayoutController");
+const {  triggerMLMCommissions, getMemberCommissionSummary, getMemberPayouts, getDailyPayout, climeRewardLoan } = require("../controllers/Users/Payout/PayoutController");
 const { getPendingTransactions, approveWithdrawal } = require("../controllers/Users/payoutPending/pendingTransactions");
 const { getWalletOverview, getWalletWithdraw } = require("../controllers/Users/walletServiece/walletServies");
 const { getUplineTree } = require("../controllers/Users/mlmService/mlmService");
+const authorizeRoles = require("../middlewares/authorizeRole");
 
 
 
@@ -53,6 +54,9 @@ router.put('/approve-withdrawal/:member_id', Authenticated, approveWithdrawal);
 
 
 // router.get("/level-benefits/:member_id", getLevelBenefits);
-router.get("/daily/:member_id", getDailyPayout);
+// User-specific daily payout (requires member_id parameter)
+router.get("/daily-payout/:member_id", Authenticated, getDailyPayout);
+
+router.post("/clime-reward-loan/:memberId",climeRewardLoan)
 
 module.exports = router;

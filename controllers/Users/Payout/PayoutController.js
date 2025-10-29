@@ -231,56 +231,56 @@ const getMemberCommissionSummary = async (req, res) => {
 };
 
 // ✅ GET UPLINE SPONSORS TREE
-const getUplineTree = async (req, res) => {
-  try {
-    const { member_id } = req.params;
+// const getUplineTree = async (req, res) => {
+//   try {
+//     const { member_id } = req.params;
     
-    const uplineTree = await getUplineTreeService(member_id, 10);
+//     const uplineTree = await getUplineTreeService(member_id, 10);
     
-    return res.json({
-      success: true,
-      data: {
-        member_id,
-        upline_tree: uplineTree,
-        total_levels: uplineTree.length,
-        commission_structure: getCommissionSummary()
-      }
-    });
-  } catch (error) {
-    console.error("Error getting upline tree:", error);
-    return res.status(500).json({ success: false, error: "Server error" });
-  }
-};
+//     return res.json({
+//       success: true,
+//       data: {
+//         member_id,
+//         upline_tree: uplineTree,
+//         total_levels: uplineTree.length,
+//         commission_structure: getCommissionSummary()
+//       }
+//     });
+//   } catch (error) {
+//     console.error("Error getting upline tree:", error);
+//     return res.status(500).json({ success: false, error: "Server error" });
+//   }
+// };
 
 // ✅ GET ALL PAYOUTS FOR MEMBER
-const getMemberPayouts = async (req, res) => {
-  try {
-    const { memberId } = req.params;
+// const getMemberPayouts = async (req, res) => {
+//   try {
+//     const { memberId } = req.params;
 
-    const payouts = await PayoutModel.find({ memberId: memberId }).sort({ date: -1 });
-    const transactions = await TransactionModel.find({ member_id: memberId });
+//     const payouts = await PayoutModel.find({ memberId: memberId }).sort({ date: -1 });
+//     const transactions = await TransactionModel.find({ member_id: memberId });
 
-    const levelBenefits = transactions
-      .filter(tx => tx.transaction_type === "Level Benefits")
-      .reduce((sum, tx) => sum + (tx.ew_credit || 0), 0);
+//     const levelBenefits = transactions
+//       .filter(tx => tx.transaction_type === "Level Benefits")
+//       .reduce((sum, tx) => sum + (tx.ew_credit || 0), 0);
 
-    return res.json({
-      success: true,
-      data: {
-        payouts,
-        summary: {
-          totalPayouts: payouts.length,
-          totalAmount: payouts.reduce((acc, p) => acc + p.amount, 0),
-          levelBenefits: levelBenefits,
-          levels_covered: [...new Set(payouts.map(p => p.level))].sort()
-        }
-      }
-    });
-  } catch (error) {
-    console.error("Error fetching member payouts:", error);
-    return res.status(500).json({ success: false, error: "Server error" });
-  }
-};
+//     return res.json({
+//       success: true,
+//       data: {
+//         payouts,
+//         summary: {
+//           totalPayouts: payouts.length,
+//           totalAmount: payouts.reduce((acc, p) => acc + p.amount, 0),
+//           levelBenefits: levelBenefits,
+//           levels_covered: [...new Set(payouts.map(p => p.level))].sort()
+//         }
+//       }
+//     });
+//   } catch (error) {
+//     console.error("Error fetching member payouts:", error);
+//     return res.status(500).json({ success: false, error: "Server error" });
+//   }
+// };
 
 
 
@@ -411,7 +411,7 @@ const climeRewardLoan = async (req, res) => {
       });
     }
 
-    // Mark as pending
+    // Mark as pending 
     member.upgrade_status = "Processing";
     await member.save();
 
@@ -571,8 +571,8 @@ const approveRejectRewardLoan = async (req, res) => {
 module.exports = {
   triggerMLMCommissions,
   getMemberCommissionSummary,
-  getUplineTree,
-  getMemberPayouts,
+  // getUplineTree,
+  // getMemberPayouts,
   getDailyPayout,
   climeRewardLoan,
   getPendingRewardLoans,

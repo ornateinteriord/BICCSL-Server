@@ -43,7 +43,7 @@ const transporter = nodemailer.createTransport({
 const sendMail = async (email, subject, htmlContent, textContent = '') => {
   try {
     const mailOptions = {
-      from: `"MSCS" <${process.env.EMAIL_USER}>`,
+      from: `"MSI" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: subject,
       html: htmlContent,

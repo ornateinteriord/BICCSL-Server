@@ -5,35 +5,76 @@ const mlmService = require("../mlmService/mlmService");
 
 const getMemberDetails = async (req, res) => {
   try {
-    const  id  = req.user.id;
+    const id = req.user.id;
+    
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid User ID", });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid User ID" 
+      });
     }
-  
-    const foundUser = await MemberModel.findById(id)|| await AdminModel.findById(id);
+
+    const foundUser = await MemberModel.findById(id) || await AdminModel.findById(id);
                   
     if (!foundUser) {
-      return res
-        .status(404)
-        .json({ success: false, message: "user not found" });
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found" 
+      });
     }
-    if(foundUser instanceof AdminModel){
-      const members = await MemberModel.find()
-      return res.status(200).json({success:true,data:foundUser,members})
+
+    // If admin, return all members
+    if (foundUser instanceof AdminModel) {
+      const members = await MemberModel.find();
+      return res.status(200).json({ 
+        success: true, 
+        data: foundUser, 
+        members 
+      });
     }
-    return res.status(200).json({ success: true, data: foundUser });
+
+    // For regular members - get actual registration counts from database
+    const directCount = await MemberModel.countDocuments({ 
+      referred_by: foundUser.Member_id 
+    });
+
+    const totalTeamCount = await MemberModel.countDocuments({
+      $or: [
+        { referred_by: foundUser.Member_id },
+        { referral_path: { $regex: foundUser.Member_id, $options: 'i' } }
+      ]
+    });
+
+    const indirectCount = totalTeamCount - directCount;
+
+    // Add registration data to response
+    const responseData = {
+      ...foundUser.toObject(),
+      registration_stats: {
+        direct: directCount,
+        indirect: indirectCount,
+        total: totalTeamCount
+      }
+    };
+
+    return res.status(200).json({ 
+      success: true, 
+      data: responseData 
+    });
+
   } catch (error) {
     console.error("Error fetching User details:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+    return res.status(500).json({ 
+      success: false, 
+      message: "Server error" 
+    });
   }
 };
 
 const activateMemberPackage = async (req, res) => {
   try {
     const { memberId } = req.params;
-    const { packageType } = req.body; // 👈 new: get package type from frontend (e.g., "standard" or "RD")
+    const { packageType } = req.body; 
 
     let query;
     if (mongoose.Types.ObjectId.isValid(memberId)) {

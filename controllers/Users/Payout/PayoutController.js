@@ -5,16 +5,12 @@ const {
   updateSponsorReferrals,
   calculateCommissions,
   processCommissions,
-  getUplineTree: getUplineTreeService,
-  getCommissionSummary,
-  commissionRates,
   getOrdinal
 } = require("../mlmService/mlmService");
 
-// ✅ TRIGGER MLM COMMISSIONS FOR 10 LEVELS (₹25 EACH)
 const triggerMLMCommissions = async (req, res) => {
   try {
-    console.log("📨 Request Body:", req.body);
+
 
     const { new_member_id, sponsor_code } = req.body;
 
@@ -24,8 +20,6 @@ const triggerMLMCommissions = async (req, res) => {
         message: "new_member_id and sponsor_code are required"
       });
     }
-
-    // ✅ Get new member from Transaction _tbl instead of MemberModel
     const newMember = await TransactionModel.findOne({ member_id: new_member_id });
     if (!newMember) {
       return res.status(404).json({
@@ -35,7 +29,7 @@ const triggerMLMCommissions = async (req, res) => {
       });
     }
 
-    // ✅ CHECK: Verify NEW MEMBER is ACTIVE (using transaction status if available)
+   
     if (newMember.status && newMember.status !== 'active') {
       return res.status(400).json({
         success: false,
@@ -47,11 +41,10 @@ const triggerMLMCommissions = async (req, res) => {
       });
     }
 
-    // ✅ FLEXIBLE SPONSOR LOOKUP: Try member_code first, then member_id from transactions
     let sponsor = await TransactionModel.findOne({ member_code: sponsor_code });
     
     if (!sponsor) {
-      // If not found by member_code, try by member_id
+
       sponsor = await TransactionModel.findOne({ member_id: sponsor_code });
     }
 
@@ -66,7 +59,6 @@ const triggerMLMCommissions = async (req, res) => {
 
     console.log(`🚀 Triggering MLM commissions - New: ${new_member_id}, Sponsor: ${sponsor_code} -> ${sponsor.member_id} (${sponsor.Name || sponsor.member_name})`);
 
-    // ✅ UPDATE: Update transaction record with sponsor information
     await TransactionModel.findOneAndUpdate(
       { member_id: new_member_id },
       { 
@@ -230,58 +222,6 @@ const getMemberCommissionSummary = async (req, res) => {
   }
 };
 
-// ✅ GET UPLINE SPONSORS TREE
-// const getUplineTree = async (req, res) => {
-//   try {
-//     const { member_id } = req.params;
-    
-//     const uplineTree = await getUplineTreeService(member_id, 10);
-    
-//     return res.json({
-//       success: true,
-//       data: {
-//         member_id,
-//         upline_tree: uplineTree,
-//         total_levels: uplineTree.length,
-//         commission_structure: getCommissionSummary()
-//       }
-//     });
-//   } catch (error) {
-//     console.error("Error getting upline tree:", error);
-//     return res.status(500).json({ success: false, error: "Server error" });
-//   }
-// };
-
-// ✅ GET ALL PAYOUTS FOR MEMBER
-// const getMemberPayouts = async (req, res) => {
-//   try {
-//     const { memberId } = req.params;
-
-//     const payouts = await PayoutModel.find({ memberId: memberId }).sort({ date: -1 });
-//     const transactions = await TransactionModel.find({ member_id: memberId });
-
-//     const levelBenefits = transactions
-//       .filter(tx => tx.transaction_type === "Level Benefits")
-//       .reduce((sum, tx) => sum + (tx.ew_credit || 0), 0);
-
-//     return res.json({
-//       success: true,
-//       data: {
-//         payouts,
-//         summary: {
-//           totalPayouts: payouts.length,
-//           totalAmount: payouts.reduce((acc, p) => acc + p.amount, 0),
-//           levelBenefits: levelBenefits,
-//           levels_covered: [...new Set(payouts.map(p => p.level))].sort()
-//         }
-//       }
-//     });
-//   } catch (error) {
-//     console.error("Error fetching member payouts:", error);
-//     return res.status(500).json({ success: false, error: "Server error" });
-//   }
-// };
-
 
 
 const getDailyPayout = async (req, res) => {
@@ -296,16 +236,15 @@ const getDailyPayout = async (req, res) => {
 
     let query = {};
 
-    // 🔹 Role-based data access
+
     if (userRole === "ADMIN") {
-      // Admin can see all payouts, or a specific member if member_id is passed
+    
       query = member_id ? { member_id } : {};
     } else if (userRole === "USER") {
-      // Users can see only their own payouts
+
       query = { member_id: member_id  };
     }
 
-    // 🔹 Fetch transactions based on role
     const transactions = await TransactionModel.find({
       ...query,
       $or: [
@@ -385,13 +324,13 @@ const getDailyPayout = async (req, res) => {
 const climeRewardLoan = async (req, res) => {
   try {
     const { memberId } = req.params;
-    const { amount, note } = req.body;
+    const { note } = req.body;
 
     // Validate request
-    if (!memberId || !amount || isNaN(amount) || Number(amount) <= 0) {
+    if (!memberId) {
       return res.status(400).json({
         success: false,
-        message: "Valid memberId and loan amount are required.",
+        message: "Member ID is required.",
       });
     }
 
@@ -410,27 +349,27 @@ const climeRewardLoan = async (req, res) => {
         message: `Loan claim already in status: ${member.upgrade_status}. Please wait for admin review.`,
       });
     }
+    const loanAmount = 5000;
 
-    // Mark as pending 
     member.upgrade_status = "Processing";
     await member.save();
 
-    // Create transaction
     const tx = new TransactionModel({
       transaction_id: `RL-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       transaction_date: new Date().toISOString(),
       member_id: member.Member_id,
-      description: `Reward loan request of ₹${amount}${note ? ` - ${note}` : ""}`,
+      Name: member.Name,
+      mobileno: member.mobileno,
+      description: `Reward loan request of ₹${loanAmount}${note ? ` - ${note}` : ""}`,
       transaction_type: "Reward Loan Request",
-      ew_credit: amount, 
+      ew_credit: loanAmount, 
       ew_debit: "0",
       status: "Processing",
-      net_amount: amount,
+      net_amount: loanAmount,
       benefit_type: "loan",
       previous_balance: "",
       reference_no: `RLREF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      // ADD THIS LINE - Set the amount field
-      amount: amount
+      amount: loanAmount
     });
 
     await tx.save();
@@ -441,7 +380,7 @@ const climeRewardLoan = async (req, res) => {
       data: {
         member_id: member.Member_id,
         status: member.upgrade_status,
-        requested_amount: amount,
+        requested_amount: loanAmount,
         transaction_ref: tx.reference_no,
       },
     });
@@ -452,31 +391,32 @@ const climeRewardLoan = async (req, res) => {
       .json({ success: false, message: "Server error", error: error.message });
   }
 };
-// controllers/adminController.js
 
-// GET - Get pending reward loans
-const getPendingRewardLoans = async (req, res) => {
+
+const getRewardLoansByStatus = async (req, res) => {
   try {
-    const pendingLoans = await TransactionModel.find({
+    const { status } = req.params; 
+
+    const loans = await TransactionModel.find({
       transaction_type: "Reward Loan Request",
-      status: "Processing" // Change from "Pending" to "Processing"
+      status: status 
     })
     .sort({ transaction_date: -1 });
 
     const totalCount = await TransactionModel.countDocuments({
       transaction_type: "Reward Loan Request",
-      status: "Processing" // Change from "Pending" to "Processing"
+      status: status 
     });
 
     return res.status(200).json({
       success: true,
       data: {
-        pendingLoans,
+        loans, 
         totalCount
       },
     });
   } catch (error) {
-    console.error("Error in getPendingRewardLoans:", error);
+    console.error("Error in getRewardLoansByStatus:", error);
     return res.status(500).json({ 
       success: false, 
       message: "Server error" 
@@ -485,15 +425,14 @@ const getPendingRewardLoans = async (req, res) => {
 };
 
 
-const approveRejectRewardLoan = async (req, res) => {
+const processRewardLoan = async (req, res) => {
   try {
-    const { memberId } = req.params;
-    const { action, adminNotes, approvedBy } = req.body;
+    const { memberId, action } = req.params;
 
-    if (!memberId || !action || !approvedBy) {
+    if (!memberId || !action) {
       return res.status(400).json({
         success: false,
-        message: "Member ID, action, and approved by are required.",
+        message: "Member ID and action are required.",
       });
     }
 
@@ -504,7 +443,7 @@ const approveRejectRewardLoan = async (req, res) => {
       });
     }
 
-
+    // Find the pending reward loan
     const transaction = await TransactionModel.findOne({
       member_id: memberId,
       transaction_type: "Reward Loan Request",
@@ -529,18 +468,23 @@ const approveRejectRewardLoan = async (req, res) => {
     const now = new Date().toISOString();
     
     if (action === 'approve') {
+
       transaction.status = "Approved";
-      transaction.ew_credit = transaction.amount;
-      transaction.net_amount = transaction.amount;
-      member.wallet_balance = (parseFloat(member.wallet_balance) || 0) + parseFloat(transaction.amount);
+      
+      const currentBalance = parseFloat(member.wallet_balance) || 0;
+      const loanAmount = parseFloat(transaction.amount) || 0;
+      member.wallet_balance = currentBalance + loanAmount;
       member.upgrade_status = "Approved";
+
+      transaction.admin_notes = "Loan approved by admin";
     } else {
       transaction.status = "Rejected";
       member.upgrade_status = "Rejected";
+
+      transaction.admin_notes = "Loan rejected by admin";
     }
 
-    transaction.admin_notes = adminNotes || `Loan ${action}ed by admin`;
-    transaction.approved_by = approvedBy;
+    transaction.approved_by = "admin";
     transaction.approved_at = now;
 
     await Promise.all([member.save(), transaction.save()]);
@@ -552,7 +496,8 @@ const approveRejectRewardLoan = async (req, res) => {
         member_id: member.Member_id,
         member_name: member.Name,
         status: transaction.status,
-        amount: transaction.amount,
+        amount: transaction.amount, 
+        transaction_ref: transaction.reference_no,
         ...(action === 'approve' && { 
           new_wallet_balance: member.wallet_balance 
         })
@@ -560,7 +505,7 @@ const approveRejectRewardLoan = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error in approveRejectRewardLoan:", error);
+    console.error("Error processing reward loan:", error);
     return res.status(500).json({ 
       success: false, 
       message: "Server error" 
@@ -571,10 +516,8 @@ const approveRejectRewardLoan = async (req, res) => {
 module.exports = {
   triggerMLMCommissions,
   getMemberCommissionSummary,
-  // getUplineTree,
-  // getMemberPayouts,
   getDailyPayout,
   climeRewardLoan,
-  getPendingRewardLoans,
-  approveRejectRewardLoan
+  getRewardLoansByStatus,
+  processRewardLoan
 };

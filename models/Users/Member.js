@@ -40,7 +40,7 @@ const MemberSchema = new mongoose.Schema(
     roi_status: { type: String },
     upgrade_package: { type: String },
     upgrade_status: { type: String,
-      enum: [ "Pending", "Processing", "Completed", "Rejected"], 
+      enum: [ "Pending", "Processing","Approved", "Completed", "Rejected"], 
       default: "Pending"
      },
     level_eligible: { type: String },

@@ -1,5 +1,5 @@
 const generateMSCSEmail = (memberId, password, name = 'Member') => {
-  const welcomeSubject = 'MSCS - Account Registration Successful';
+  const welcomeSubject = 'MSI - Account Registration Successful';
   
   const welcomeMessage = `
     <div style="font-family: Arial, sans-serif; padding: 10px; line-height: 1.6; margin-bottom: 100px; max-width: 700px; margin: 0 auto;">

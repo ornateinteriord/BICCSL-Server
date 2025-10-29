@@ -10,7 +10,7 @@ const { getSponsers, checkSponsorReward } = require("../controllers/Users/Sponse
 const { getMultiLevelSponsorship } = require("../controllers/Users/Sponser/multiLevelSponsorship");
 const { createTicket, getTickets } = require("../controllers/Users/Ticket/TicketConntroller");
 const Authenticated = require("../middlewares/auth");
-const {  triggerMLMCommissions, getMemberCommissionSummary, getMemberPayouts, getDailyPayout, climeRewardLoan } = require("../controllers/Users/Payout/PayoutController");
+const {  triggerMLMCommissions, getMemberCommissionSummary, getDailyPayout, climeRewardLoan } = require("../controllers/Users/Payout/PayoutController");
 const { getPendingTransactions, approveWithdrawal } = require("../controllers/Users/payoutPending/pendingTransactions");
 const { getWalletOverview, getWalletWithdraw } = require("../controllers/Users/walletServiece/walletServies");
 const { getUplineTree } = require("../controllers/Users/mlmService/mlmService");
@@ -44,8 +44,8 @@ router.get('/multi-level-sponsors', Authenticated, getMultiLevelSponsorship);
 
 router.post("/mlm/trigger-commissions", triggerMLMCommissions);
 router.get("/mlm/commission-summary/:member_id", getMemberCommissionSummary);
-router.get("/mlm/upline-tree/:member_id", Authenticated, getUplineTree);
-router.get("/mlm/payouts/:memberId", Authenticated, getMemberPayouts);
+// router.get("/mlm/upline-tree/:member_id", Authenticated, getUplineTree);
+// router.get("/mlm/payouts/:memberId", Authenticated, getMemberPayouts);
 
 
 router.get("/overview/:memberId", Authenticated, getWalletOverview);

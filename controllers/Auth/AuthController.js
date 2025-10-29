@@ -7,12 +7,12 @@ const {
 const { generateOTP, storeOTP, verifyOTP } = require("../../utils/OtpService");
 const { generateMSCSEmail } = require("../../utils/generateMSCSEmail");
 
-const recoverySubject = "MSCS - Password Recovery";
-const resetPasswordSubject =  "MSCS - OTP Verification";
+const recoverySubject = "MSI - Password Recovery";
+const resetPasswordSubject =  "MSI - OTP Verification";
 
 const generateUniqueMemberId = async () => {
   while (true) {
-    const memberId = `MSCS${Math.floor(100000 + Math.random() * 900000)}`;
+    const memberId = `MSI${Math.floor(100000 + Math.random() * 900000)}`;
     if (!(await MemberModel.exists({ Member_id: memberId }))) {
       return memberId;
     }
@@ -43,7 +43,7 @@ const signup = async (req, res) => {
 
       const { welcomeMessage, welcomeSubject } = generateMSCSEmail(memberId, password, Name);
       
-      const textContent = `Dear ${Name}, Your account registration with MSCS has been completed. Member ID: ${memberId}, Password: ${password}. Your account is under verification process.`;
+      const textContent = `Dear ${Name}, Your account registration with MSI has been completed. Member ID: ${memberId}, Password: ${password}. Your account is under verification process.`;
       
 
       await sendMail(email, welcomeSubject, welcomeMessage, textContent);
@@ -96,7 +96,7 @@ const recoverPassword = async (req, res) => {
       .status(404)
       .json({ success: false, message: "Email not registered" });
     }
-    const recoveryDescription = `Dear Member,\n\nYou requested a password recovery. Here is your password:\n ${user.password}\n\nPlease keep this information secure.\n\nBest regards,\nMSCS Team`;
+    const recoveryDescription = `Dear Member,\n\nYou requested a password recovery. Here is your password:\n ${user.password}\n\nPlease keep this information secure.\n\nBest regards,\MSI Team`;
 
     await sendMail(user.email, recoverySubject, recoveryDescription);
     res.json({ success: true, message: "Password sent to your email" });
@@ -134,7 +134,7 @@ const resetPassword = async (req, res) => {
       });
     }
     const newOtp = generateOTP();
-    const resetPasswordDescription = `Dear Member,\n\nYour OTP for password reset is: ${newOtp}\n\nPlease use this OTP to proceed with resetting your password.\n\nPlease keep don't share with anyone.\n\nBest regards,\nBICCSL Team`;
+    const resetPasswordDescription = `Dear Member,\n\nYour OTP for password reset is: ${newOtp}\n\nPlease use this OTP to proceed with resetting your password.\n\nPlease keep don't share with anyone.\n\nBest regards,\nMSI Team`;
     storeOTP(email, newOtp);
     await sendMail(email, resetPasswordSubject , resetPasswordDescription);
     return res.json({ success: true, message: "OTP sent to your email" });

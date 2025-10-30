@@ -15,7 +15,6 @@ const getWalletOverview = async (req, res) => {
 
     const transactions = await TransactionModel.find({ member_id: memberId });
 
-    // Include both Completed AND Pending transactions for balance calculation
     const completedAndPendingTx = transactions.filter(tx => 
       tx.status === "Completed" || tx.status === "Pending" || tx.status === "Approved"
     );

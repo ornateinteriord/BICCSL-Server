@@ -13,8 +13,6 @@ const Authenticated = require("../middlewares/auth");
 const {  triggerMLMCommissions, getMemberCommissionSummary, getDailyPayout, climeRewardLoan } = require("../controllers/Users/Payout/PayoutController");
 const { getPendingTransactions, approveWithdrawal } = require("../controllers/Users/payoutPending/pendingTransactions");
 const { getWalletOverview, getWalletWithdraw } = require("../controllers/Users/walletServiece/walletServies");
-const { getUplineTree } = require("../controllers/Users/mlmService/mlmService");
-const authorizeRoles = require("../middlewares/authorizeRole");
 
 
 

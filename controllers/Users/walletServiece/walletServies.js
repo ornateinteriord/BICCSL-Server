@@ -138,10 +138,52 @@ const getWalletWithdraw = async (req, res) => {
     const member = await MemberModel.findOne({ Member_id: memberId });
     if (!member) return res.status(404).json({ success: false, message: "Member not found" });
 
-    // Get ALL transactions (both Completed and Pending) for balance calculation
+    // Calculate last Saturday
+    const today = new Date();
+    const lastSaturday = new Date(today);
+    
+    const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
+    // Correct calculation: go back to previous Saturday
+    const daysSinceSaturday = dayOfWeek === 6 ? 0 : dayOfWeek + 1;
+    
+    lastSaturday.setDate(today.getDate() - daysSinceSaturday);
+    lastSaturday.setHours(0, 0, 0, 0);
+
+    console.log("dayOfweek:", dayOfWeek);
+    console.log("daysSinceSaturday:", daysSinceSaturday);
+    console.log("lastSaturday:", lastSaturday.toISOString());
+
+    // Check if member has any ACTIVE LOAN (Approved with net_amount > 0)
+    const activeLoan = await TransactionModel.findOne({
+      member_id: memberId,
+      transaction_type: { $regex: /loan/i },
+      status: "Approved",
+      net_amount: { $gt: "0" } // Loan is still unpaid
+    });
+
+    console.log("Active Loan Found:", !!activeLoan);
+    if (activeLoan) {
+      console.log("Active Loan Details:", {
+        transaction_date: activeLoan.transaction_date,
+        net_amount: activeLoan.net_amount,
+        transaction_type: activeLoan.transaction_type
+      });
+    }
+
+    // Check if loan was taken BEFORE last Saturday
+    let hasUnpaidLoan = false;
+    if (activeLoan) {
+      const loanDate = new Date(activeLoan.transaction_date);
+      console.log("Loan Date:", loanDate.toISOString());
+      console.log("Last Saturday:", lastSaturday.toISOString());
+      
+      // If loan was taken before last Saturday and still unpaid, block withdrawal
+      hasUnpaidLoan = loanDate < lastSaturday;
+      console.log("Loan taken before last Saturday:", hasUnpaidLoan);
+    }
+
     const allTransactions = await TransactionModel.find({ member_id: memberId });
 
-    // Filter out loan transactions for balance calculation
     const nonLoanTransactions = allTransactions.filter(tx => 
       !tx.transaction_type?.toLowerCase().includes('loan') &&
       !tx.description?.toLowerCase().includes('loan')
@@ -158,7 +200,6 @@ const getWalletWithdraw = async (req, res) => {
     let availableBalance = totalCredits - totalDebits;
     availableBalance = Math.max(0, availableBalance);
 
-    // Benefits calculation from completed transactions only
     const completedTransactions = nonLoanTransactions.filter(tx => tx.status === "Completed");
     
     const levelBenefits = completedTransactions
@@ -179,7 +220,6 @@ const getWalletWithdraw = async (req, res) => {
       )
       .reduce((acc, tx) => acc + (parseFloat(tx.ew_credit) || 0), 0);
 
-    // Repayment Commission calculation
     const repaymentCommission = completedTransactions
       .filter(tx => 
         tx.transaction_type === "Repayment Commission" || 
@@ -193,7 +233,12 @@ const getWalletWithdraw = async (req, res) => {
       return res.status(400).json({ 
         success: false, 
         message: "Minimum withdrawal amount is ₹500",
-        minimum: 500
+        minimum: 500,
+        loanStatus: {
+          hasUnpaidLoan: hasUnpaidLoan,
+          isWithdrawalAllowed: !hasUnpaidLoan,
+          message: hasUnpaidLoan ? "Withdrawal blocked - Unpaid loan from before last Saturday" : "No unpaid loans"
+        }
       });
     }
 
@@ -201,7 +246,32 @@ const getWalletWithdraw = async (req, res) => {
       return res.status(400).json({ 
         success: false, 
         message: "Maximum withdrawal amount is ₹1000",
-        maximum: 1000
+        maximum: 1000,
+        loanStatus: {
+          hasUnpaidLoan: hasUnpaidLoan,
+          isWithdrawalAllowed: !hasUnpaidLoan,
+          message: hasUnpaidLoan ? "Withdrawal blocked - Unpaid loan from before last Saturday" : "No unpaid loans"
+        }
+      });
+    }
+
+    // Check if member has unpaid loan from before last Saturday
+    if (hasUnpaidLoan) {
+      return res.status(400).json({
+        success: false,
+        message: "Withdrawal not allowed - You have unpaid loan amount from before last Saturday",
+        loanStatus: {
+          hasUnpaidLoan: true,
+          isWithdrawalAllowed: false,
+          lastSaturday: lastSaturday.toDateString(),
+          loanDate: activeLoan?.transaction_date,
+          unpaidAmount: activeLoan?.net_amount,
+          message: "Please clear your pending loan amount to enable withdrawals"
+        },
+        details: {
+          requested: withdrawalAmount.toFixed(2),
+          available: availableBalance.toFixed(2),
+        }
       });
     }
 
@@ -209,6 +279,11 @@ const getWalletWithdraw = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Insufficient balance",
+        loanStatus: {
+          hasUnpaidLoan: hasUnpaidLoan,
+          isWithdrawalAllowed: !hasUnpaidLoan,
+          message: hasUnpaidLoan ? "Withdrawal blocked - Unpaid loan from before last Saturday" : "No unpaid loans - Withdrawal allowed if balance is sufficient"
+        },
         details: {
           requested: withdrawalAmount.toFixed(2),
           available: availableBalance.toFixed(2),
@@ -260,7 +335,6 @@ const getWalletWithdraw = async (req, res) => {
 
     await newTransaction.save();
 
-    // Calculate new balance including the pending withdrawal
     let newAvailableBalance = availableBalance - withdrawalAmount;
     newAvailableBalance = Math.max(0, newAvailableBalance);
 
@@ -287,6 +361,11 @@ const getWalletWithdraw = async (req, res) => {
           totalBenefits: (levelBenefits + directBenefits + repaymentCommission).toFixed(2),
           benefitsContribution: `${((levelBenefits + directBenefits + repaymentCommission) / (totalCredits || 1) * 100).toFixed(1)}% of total income`
         },
+        loanStatus: {
+          hasUnpaidLoan: false,
+          isWithdrawalAllowed: true,
+          message: "No unpaid loans - Withdrawal processed successfully"
+        },
         status: "Pending",
         calculation: {
           deduction: `15% of ₹${withdrawalAmount.toFixed(2)} = ₹${deduction.toFixed(2)}`,
@@ -305,5 +384,6 @@ const getWalletWithdraw = async (req, res) => {
     });
   }
 };
+
 
 module.exports = { getWalletOverview, getWalletWithdraw };

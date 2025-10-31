@@ -27,19 +27,19 @@ const getTransactionDetails = async (req, res) => {
         message: `No ${status && status !== 'all' ? status + ' ' : ''}transactions found` 
       });
     }
-    const today = new Date();
+    // const today = new Date();
+    // const dayOfWeek = today.getDay(); 
+    // const isSaturday = true;
+    // const isRepayEnabled = true;
+
+     const today = new Date();
     const dayOfWeek = today.getDay(); 
-    const isSaturday = true;
-    const isRepayEnabled = true;
+    const isSaturday = dayOfWeek === 6;
+    const isRepayEnabled = isSaturday;
 
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const currentDayName = dayNames[dayOfWeek];
     const enabledDays = "Saturday"; 
-
-    console.log("Backend - Today:", today);
-    console.log("Backend - Day of week:", dayOfWeek);
-    console.log("Backend - Is Saturday:", isSaturday);
-    console.log("Backend - Is repay enabled:", isRepayEnabled);
 
     return res.status(200).json({ 
       success: true, 

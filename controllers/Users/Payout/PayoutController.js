@@ -371,7 +371,7 @@ const climeRewardLoan = async (req, res) => {
       ew_credit: loanAmount,
       ew_debit: "0",
       status: "Processing",
-      net_amount: loanAmount,
+      // net_amount: loanAmount,
       benefit_type: "loan",
       previous_balance: "",
       reference_no: `RLREF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -448,15 +448,15 @@ const processRewardLoan = async (req, res) => {
     // ... (Error handling for member not found remains the same) ...
 
     const now = new Date().toISOString();
-    const loanAmount = parseFloat(transaction.amount) || 0;
+    const loanAmount = parseFloat(transaction.amount) || 5000;
 
     if (action === "approve") {
       transaction.status = "Approved";
 
       // ✅ CRITICAL UPDATE: Use net_amount to track the DUE BALANCE
       // Set the net_amount to the full loan amount upon approval.
-      // transaction.net_amount = loanAmount.toString();
-      // Set the initial repayment status
+      transaction.net_amount = loanAmount.toString();
+  
       transaction.repayment_status = "Unpaid";
 
       member.upgrade_status = "Approved";
@@ -484,7 +484,6 @@ const processRewardLoan = async (req, res) => {
         amount: transaction.amount,
         transaction_ref: transaction.reference_no,
         ...(action === "approve" && {
-          // Show the initial amount due from the field we are reusing
           initial_due_amount: transaction.net_amount,
         }),
       },

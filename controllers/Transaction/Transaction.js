@@ -27,32 +27,49 @@ const getTransactionDetails = async (req, res) => {
         message: `No ${status && status !== 'all' ? status + ' ' : ''}transactions found` 
       });
     }
-    // const today = new Date();
-    // const dayOfWeek = today.getDay(); 
-    // const isSaturday = true;
-    // const isRepayEnabled = true;
 
-     const today = new Date();
+    // Check if today is Saturday
+    const today = new Date();
     const dayOfWeek = today.getDay(); 
     const isSaturday = dayOfWeek === 6;
-    const isRepayEnabled = isSaturday;
+    
+    // Check if user already made a repayment today
+    const todayStart = new Date(today);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
 
+    const existingRepaymentToday = await TransactionModel.findOne({
+      member_id: loggedInMemberId,
+      transaction_type: 'Loan Repayment',
+      createdAt: {
+        $gte: todayStart,
+        $lte: todayEnd
+      }
+    });
+
+    // Repay is enabled only on Saturday AND if no repayment was made today
+    const isRepayEnabled = isSaturday && !existingRepaymentToday;
+
+    // Get day names for additional info
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const currentDayName = dayNames[dayOfWeek];
-    const enabledDays = "Saturday"; 
+    const enabledDays = "Saturday";
 
     return res.status(200).json({ 
       success: true, 
       data: transactions,
       filter: status || 'all',
       repayConfig: {
-        isEnabled: isRepayEnabled, 
+        isEnabled: isRepayEnabled,
         enabledDays: enabledDays,
         currentDay: currentDayName,
         message: isRepayEnabled 
           ? `Repayment is available today (${currentDayName})` 
           : `Repayment is only available on ${enabledDays}`
-      }
+      },
+      isRepayEnabled: isRepayEnabled,
+      alreadyRepaidToday: !!existingRepaymentToday
     });
   } catch (error) {
     console.error("Error fetching transaction details:", error);
@@ -61,3 +78,8 @@ const getTransactionDetails = async (req, res) => {
 };
 
 module.exports = getTransactionDetails;
+
+    // const today = new Date();
+    // const dayOfWeek = today.getDay(); 
+    // const isSaturday = true;
+    // const isRepayEnabled = true;

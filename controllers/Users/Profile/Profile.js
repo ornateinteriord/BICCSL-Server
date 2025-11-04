@@ -1,7 +1,7 @@
 const MemberModel = require("../../../models/Users/Member");
 const mongoose = require("mongoose");
 const AdminModel = require("../../../models/Admin/Admin");
-const mlmService = require("../mlmService/mlmService");
+const { triggerMLMCommissions } = require("../Payout/PayoutController");
 
 const getMemberDetails = async (req, res) => {
   try {
@@ -121,22 +121,33 @@ const activateMemberPackage = async (req, res) => {
       });
     }
 
-    // MLM activation only when status changes
+    // MLM activation only when status changes to active
     if (oldStatus !== "active" && updatedMember.status === "active") {
       try {
-        const mlmResult = await mlmService.processMemberActivation(updatedMember.Member_id);
+        // Trigger MLM commissions
+        const mlmResult = await triggerMLMCommissions({
+          body: {
+            new_member_id: updatedMember.Member_id,
+            Sponsor_code: updatedMember.sponsor_id || updatedMember.Sponsor_code
+          }
+        }, {
+          status: (code) => ({ json: (data) => data }),
+          json: (data) => data
+        });
+
         return res.status(200).json({
           success: true,
           data: updatedMember,
           message: `${selectedPackage.name} package activated successfully`,
-          mlmResult,
+          mlm_commission: mlmResult
         });
       } catch (mlmError) {
+        console.error("MLM Commission Error:", mlmError);
         return res.status(200).json({
           success: true,
           data: updatedMember,
           message: `${selectedPackage.name} package activated successfully (MLM process error)`,
-          mlmError: mlmError.message,
+          mlm_error: mlmError.message
         });
       }
     }
@@ -144,7 +155,7 @@ const activateMemberPackage = async (req, res) => {
     return res.status(200).json({
       success: true,
       data: updatedMember,
-      message: `${selectedPackage.name} package activated successfully`,
+      message: `${selectedPackage.name} package activated successfully`
     });
 
   } catch (error) {
@@ -152,6 +163,7 @@ const activateMemberPackage = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server error",
+      error: error.message
     });
   }
 };
@@ -281,23 +293,33 @@ const updateMemberStatus = async (req, res) => {
     const oldStatus = existingMember.status;
     const updatedMember = await MemberModel.findOneAndUpdate(query, { status }, { new: true });
 
-    // If status changed to active (from anything else) trigger MLM activation flow
+    // If status changed to active (from any status) trigger MLM commissions
     if (oldStatus !== "active" && status === "active") {
       try {
-        const result = await mlmService.processMemberActivation(updatedMember.Member_id);
+        // Trigger MLM commissions
+        const mlmResult = await triggerMLMCommissions({
+          body: {
+            new_member_id: updatedMember.Member_id,
+            Sponsor_code: updatedMember.sponsor_id || updatedMember.Sponsor_code
+          }
+        }, {
+          status: (code) => ({ json: (data) => data }),
+          json: (data) => data
+        });
+
         return res.status(200).json({
           success: true,
           message: "Member status updated to active",
           data: updatedMember,
-          mlmResult: result
+          mlm_commission: mlmResult
         });
-      } catch (err) {
-        // return success for status update but report mlm error
+      } catch (mlmError) {
+        console.error("MLM Commission Error:", mlmError);
         return res.status(200).json({
           success: true,
-          message: "Member status updated to active (MLM processing failed)",
+          message: "Member status updated to active (MLM process error)",
           data: updatedMember,
-          mlmError: err.message
+          mlm_error: mlmError.message
         });
       }
     }

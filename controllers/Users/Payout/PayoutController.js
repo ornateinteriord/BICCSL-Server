@@ -6,91 +6,94 @@ const {
   calculateCommissions,
   processCommissions,
   getOrdinal,
+  commissionRates,
+  getUplineTree
 } = require("../mlmService/mlmService");
 
 const triggerMLMCommissions = async (req, res) => {
   try {
-    const { new_member_id, sponsor_code } = req.body;
+    const { new_member_id, Sponsor_code } = req.body;
 
-    if (!new_member_id || !sponsor_code) {
+    console.log("🟢 Incoming Request Data:", { new_member_id, Sponsor_code });
+
+    if (!new_member_id || !Sponsor_code) {
       return res.status(400).json({
         success: false,
-        message: "new_member_id and sponsor_code are required",
+        message: "Member ID and Sponsor code are required"
       });
     }
-    const newMember = await TransactionModel.findOne({
-      member_id: new_member_id,
-    });
+
+    // Find new member
+    const newMember = await MemberModel.findOne({ Member_id: new_member_id });
+    console.log("📘 Found New Member:", newMember);
+
     if (!newMember) {
       return res.status(404).json({
         success: false,
-        message: "New member not found in transactions",
-        new_member_id,
+        message: `Member not found: ${new_member_id}`
       });
     }
 
-    if (newMember.status && newMember.status !== "active") {
+    if (newMember.status !== "active") {
       return res.status(400).json({
         success: false,
-        message: "Cannot process commissions - New member is not active",
-        new_member_id: newMember.member_id,
-        new_member_name: newMember.Name || newMember.member_name,
-        new_member_status: newMember.status,
-        required_status: "active",
+        message: `Member status must be active, current status: ${newMember.status}`
       });
     }
 
-    let sponsor = await TransactionModel.findOne({ member_code: sponsor_code });
-
-    if (!sponsor) {
-      sponsor = await TransactionModel.findOne({ member_id: sponsor_code });
-    }
+    // Find sponsor using Member_id instead of member_code
+    const sponsor = await MemberModel.findOne({ Member_id: Sponsor_code });
+    console.log("📗 Found Sponsor:", sponsor);
 
     if (!sponsor) {
       return res.status(404).json({
         success: false,
-        message: "Sponsor not found in transactions",
-        sponsor_code,
-        suggestion: "Use member_code or member_id from transaction records",
+        message: `Sponsor not found with ID: ${Sponsor_code}`
       });
     }
 
     console.log(
-      `🚀 Triggering MLM commissions - New: ${new_member_id}, Sponsor: ${sponsor_code} -> ${
-        sponsor.member_id
-      } (${sponsor.Name || sponsor.member_name})`
+      `🚀 Triggering MLM commissions - New Member: ${new_member_id}, Direct Sponsor: ${Sponsor_code} -> ${sponsor.Member_id} (${sponsor.Name})`
     );
 
-    await TransactionModel.findOneAndUpdate(
-      { member_id: new_member_id },
-      {
-        Sponsor_code: sponsor.member_code,
-        Sponsor_name: sponsor.Name || sponsor.member_name,
-        sponsor_id: sponsor.member_id,
-      }
-    );
+    // Update member's sponsor details if needed
+    if (newMember.sponsor_id !== sponsor.Member_id) {
+      await MemberModel.findOneAndUpdate(
+        { Member_id: new_member_id },
+        {
+          sponsor_id: sponsor.Member_id,
+          Sponsor_code: sponsor.Member_id,
+          Sponsor_name: sponsor.Name
+        }
+      );
+      console.log("🔄 Updated sponsor details for new member:", new_member_id);
+    }
 
-    await updateSponsorReferrals(sponsor.member_id, new_member_id);
-    const commissions = await calculateCommissions(
-      new_member_id,
-      sponsor.member_id
-    );
+    // Update direct sponsor's referrals list
+    await updateSponsorReferrals(sponsor.Member_id, new_member_id);
+    console.log("👥 Direct sponsor referrals updated");
+
+    // Calculate commissions for all upline sponsors (up to 10 levels)
+    // This will find all sponsors in the upline chain and calculate their commissions
+    // Level 1 (Direct Sponsor) gets ₹100, Levels 2-10 get ₹25 each
+    const commissions = await calculateCommissions(new_member_id, sponsor.Member_id);
+    console.log("💰 Calculated Commissions:", JSON.stringify(commissions, null, 2));
 
     if (commissions.length === 0) {
       return res.status(200).json({
-        success: false,
-        message: "No upline sponsors found for commission calculation",
-        data: { commissions: [] },
+        success: true,
+        message: "No eligible upline sponsors found for commission"
       });
     }
 
+    // Process all commissions (create payouts and transactions)
     const results = await processCommissions(commissions);
+    console.log("📊 Commission Processing Results:", JSON.stringify(results, null, 2));
+
+    // Calculate summary statistics
     const successfulCommissions = results.filter((r) => r.success);
     const failedCommissions = results.filter((r) => !r.success);
-    const totalAmount = successfulCommissions.reduce(
-      (sum, comm) => sum + comm.amount,
-      0
-    );
+    const totalAmount = successfulCommissions.reduce((sum, comm) => sum + comm.amount, 0);
 
     return res.status(200).json({
       success: true,
@@ -98,14 +101,14 @@ const triggerMLMCommissions = async (req, res) => {
       data: {
         new_member: {
           id: new_member_id,
-          name: newMember.Name || newMember.member_name,
-          status: newMember.status || "active",
+          name: newMember.Name,
+          status: newMember.status
         },
         sponsor: {
-          code: sponsor.member_code,
-          id: sponsor.member_id,
-          name: sponsor.Name || sponsor.member_name,
-          status: sponsor.status || "active",
+          id: sponsor.Member_id,
+          code: sponsor.Member_id,
+          name: sponsor.Name,
+          status: sponsor.status
         },
         commissions: {
           total_levels: successfulCommissions.length,
@@ -117,9 +120,8 @@ const triggerMLMCommissions = async (req, res) => {
             level: comm.level,
             sponsor_id: comm.sponsor_id,
             amount: comm.amount,
-            payout_type: `${getOrdinal(comm.level)} Level Benefits`,
+            payout_type: comm.payout_type,
           })),
-          commission_rates: commissionRates,
           failures: failedCommissions,
         },
       },
@@ -133,6 +135,7 @@ const triggerMLMCommissions = async (req, res) => {
     });
   }
 };
+
 
 const getMemberCommissionSummary = async (req, res) => {
   try {
@@ -186,7 +189,7 @@ const getMemberCommissionSummary = async (req, res) => {
     });
 
     // ✅ Get upline tree with active status information
-    const uplineTree = await getUplineTreeService(member_id, 10);
+    const uplineTree = await getUplineTree(member_id, 10);
 
     return res.json({
       success: true,

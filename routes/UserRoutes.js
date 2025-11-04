@@ -13,6 +13,7 @@ const Authenticated = require("../middlewares/auth");
 const {  triggerMLMCommissions, getMemberCommissionSummary, getDailyPayout, climeRewardLoan, repaymentLoan } = require("../controllers/Users/Payout/PayoutController");
 const { getPendingTransactions, approveWithdrawal } = require("../controllers/Users/payoutPending/pendingTransactions");
 const { getWalletOverview, getWalletWithdraw } = require("../controllers/Users/walletServiece/walletServies");
+const { getUplineTree } = require("../controllers/Users/mlmService/mlmService");
 
 
 
@@ -42,7 +43,7 @@ router.get('/multi-level-sponsors', Authenticated, getMultiLevelSponsorship);
 
 router.post("/mlm/trigger-commissions", triggerMLMCommissions);
 router.get("/mlm/commission-summary/:member_id", getMemberCommissionSummary);
-// router.get("/mlm/upline-tree/:member_id", Authenticated, getUplineTree);
+router.get("/mlm/upline-tree/:member_id", getUplineTree);
 // router.get("/mlm/payouts/:memberId", Authenticated, getMemberPayouts);
 
 

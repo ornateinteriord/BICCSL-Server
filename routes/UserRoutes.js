@@ -14,6 +14,8 @@ const {  triggerMLMCommissions, getMemberCommissionSummary, getDailyPayout, clim
 const { getPendingTransactions, approveWithdrawal } = require("../controllers/Users/payoutPending/pendingTransactions");
 const { getWalletOverview, getWalletWithdraw } = require("../controllers/Users/walletServiece/walletServies");
 const { getUplineTree } = require("../controllers/Users/mlmService/mlmService");
+// const { createOrder, getOrderStatus, webhook } = require("../controllers/Payments/CashfreeController");
+
 
 
 
@@ -59,4 +61,9 @@ router.post("/clime-reward-loan/:memberId",climeRewardLoan)
 
 router.post("/repayment-loan/:memberId",repaymentLoan)
 
+// router.post("/create-order" , createOrder);
+// router.get("/status/:orderId", getOrderStatus);
+// router.post('/webhook',webhook)
+
 module.exports = router;
+// Cashfree payments (moved from PaymentRoutes)

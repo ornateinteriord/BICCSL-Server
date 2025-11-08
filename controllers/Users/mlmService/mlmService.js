@@ -219,6 +219,7 @@ const processCommissions = async (commissions) => {
           sponsor_status: commission.sponsor_status,
           amount: commission.amount,
           payout_type: commission.payout_type,
+          benefit_type: transaction?.benefit_type || (commission.level === 1 ? "direct" : "indirect"),
           payout: payout,
           transaction: transaction
         });
@@ -271,6 +272,7 @@ const createLevelBenefitsTransaction = async (transactionData) => {
       ew_debit: 0,
       status: "Completed",
       level: level,
+      benefit_type: level === 1 ? "direct" : "indirect",
       related_member_id: new_member_id,
       related_payout_id: payout_id
     });

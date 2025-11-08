@@ -30,8 +30,8 @@ const getTransactionDetails = async (req, res) => {
 
     // Check if today is Saturday
     const today = new Date();
-    const dayOfWeek = today.getDay(); 
-    const isSaturday = dayOfWeek === 6;
+    const dayOfWeek = true; 
+    const isSaturday = true;
     
     // Check if user already made a repayment today
     const todayStart = new Date(today);

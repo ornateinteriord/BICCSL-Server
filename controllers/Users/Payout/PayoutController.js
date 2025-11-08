@@ -73,9 +73,6 @@ const triggerMLMCommissions = async (req, res) => {
     await updateSponsorReferrals(sponsor.Member_id, new_member_id);
     console.log("👥 Direct sponsor referrals updated");
 
-    // Calculate commissions for all upline sponsors (up to 10 levels)
-    // This will find all sponsors in the upline chain and calculate their commissions
-    // Level 1 (Direct Sponsor) gets ₹100, Levels 2-10 get ₹25 each
     const commissions = await calculateCommissions(new_member_id, sponsor.Member_id);
     console.log("💰 Calculated Commissions:", JSON.stringify(commissions, null, 2));
 
@@ -121,6 +118,7 @@ const triggerMLMCommissions = async (req, res) => {
             sponsor_id: comm.sponsor_id,
             amount: comm.amount,
             payout_type: comm.payout_type,
+            benefit_type: comm.level === 1 ? "direct" : "indirect",
           })),
           failures: failedCommissions,
         },

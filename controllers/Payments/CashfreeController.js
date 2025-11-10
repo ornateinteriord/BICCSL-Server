@@ -1,10 +1,10 @@
 const axios = require("axios");
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 const TransactionModel = require("../../models/Transaction/Transaction");
 const MemberModel = require("../../models/Users/Member");
 
 const CASHFREE_BASE = "https://sandbox.cashfree.com/pg";
-const X_API_VERSION = "2025-01-01";
 
 exports.createOrder = async (req, res) => {
   try {
@@ -109,18 +109,7 @@ exports.createOrder = async (req, res) => {
         new_due: newDueAmount
       });
 
-      // ✅ IMMEDIATELY UPDATE THE ORIGINAL LOAN TRANSACTION'S NET AMOUNT
-      console.log("🔄 Updating original loan transaction net_amount...");
-      loanTransaction.net_amount = newDueAmount.toFixed(2);
-      loanTransaction.repayment_status = newDueAmount <= 0 ? "Paid" : "Partially Paid";
-      loanTransaction.last_repayment_date = new Date().toISOString();
-      
-      await loanTransaction.save();
-      console.log("✅ Original loan transaction updated successfully:", {
-        transaction_id: loanTransaction.transaction_id,
-        new_net_amount: loanTransaction.net_amount,
-        repayment_status: loanTransaction.repayment_status
-      });
+
     }
 
     console.log("🔑 Checking Cashfree credentials...");
@@ -137,13 +126,13 @@ exports.createOrder = async (req, res) => {
 
     const headers = {
       "Content-Type": "application/json",
-      "x-api-version": X_API_VERSION,
+      "x-api-version": "2025-01-01",
       "x-client-id": CASHFREE_APP_ID,
       "x-client-secret": CASHFREE_SECRET_KEY,
     };
 
 
-       const returnUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/user/dashboard?payment_status={order_status}&order_id={order_id}&member_id=${memberId}`;
+    const returnUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/user/dashboard?payment_status={order_status}&order_id={order_id}&member_id=${memberId}`;
     // Use real member details for Cashfree
     const cashfreeBody = {
       order_amount: amount,
@@ -235,33 +224,20 @@ exports.createOrder = async (req, res) => {
     // If we started updating the loan transaction but failed later, we might want to revert
     // For now, we'll just log the error
     if (error.response) {
-      console.error("🚨 Cashfree API Error:");
-      console.error("Status:", error.response.status);
-      console.error("Data:", JSON.stringify(error.response.data, null, 2));
-      
-      // Handle specific Cashfree errors
-      if (error.response.status === 401) {
-        return res.status(500).json({
-          success: false,
-          message: "Payment service authentication failed.",
-          error: "Invalid Cashfree credentials"
-        });
-      }
-      
-      if (error.response.status === 400) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid payment request.",
-          error: error.response.data?.message || "Bad request to payment service"
-        });
-      }
+      console.error("🚨 Cashfree API Error:", {
+        status: error.response.status,
+        data: error.response.data,
+      });
+      return res.status(error.response.status || 500).json({
+        success: false,
+        message: error.response.data.message || "An error occurred with the payment service.",
+      });
     }
-    
-    // Generic error response
+
+    console.error("🔥 Unhandled Error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to create payment order",
-      error: error.response?.data?.message || error.message,
+      message: "An internal server error occurred.",
     });
   } finally {
     console.log("🔚 CREATE ORDER COMPLETED =====================\n");
@@ -338,20 +314,50 @@ exports.webhook = async (req, res) => {
     // If payment is successful and it's a loan repayment, process the repayment
     if (isSuccessful && paymentTransaction.is_loan_repayment) {
       console.log("💰 Processing loan repayment...");
-      await processLoanRepayment(paymentTransaction, data);
-    } else if (!isSuccessful && paymentTransaction.is_loan_repayment) {
-      console.log("🔄 Payment failed for loan repayment, reverting loan updates...");
-      await revertLoanRepayment(paymentTransaction, data);
+
+      const session = await mongoose.startSession();
+      session.startTransaction();
+
+      try {
+        const loanTransaction = await TransactionModel.findOne({
+          member_id: paymentTransaction.member_id,
+          transaction_type: "Reward Loan Request",
+          status: "Approved",
+        }).session(session);
+
+        if (loanTransaction) {
+          const currentDueAmount = parseFloat(loanTransaction.net_amount) || parseFloat(loanTransaction.ew_credit) || 0;
+          const newDueAmount = currentDueAmount - paymentTransaction.ew_debit;
+
+          loanTransaction.net_amount = newDueAmount.toFixed(2);
+          loanTransaction.repayment_status = newDueAmount <= 0 ? "Paid" : "Partially Paid";
+          loanTransaction.last_repayment_date = new Date().toISOString();
+
+          await loanTransaction.save({ session });
+        }
+
+        await session.commitTransaction();
+        session.endSession();
+
+        console.log("✅ Loan repayment processed successfully");
+      } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        console.error("❌ Error processing loan repayment:", error);
+        // Handle the error, maybe by retrying the transaction
+      }
     }
 
     console.log("✅ Webhook processing completed successfully");
     res.status(200).send("OK");
   } catch (err) {
     console.error("❌ WEBHOOK ERROR =====================");
-    console.error("Error name:", err.name);
-    console.error("Error message:", err.message);
-    console.error("Stack trace:", err.stack);
-    res.status(500).send("Internal error");
+    console.error("Error processing webhook:", {
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
+    });
+    res.status(500).send("Internal Server Error");
   } finally {
     console.log("🔚 WEBHOOK PROCESSING COMPLETED =====================\n");
   }

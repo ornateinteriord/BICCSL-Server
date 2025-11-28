@@ -8,28 +8,25 @@ require("./models/db");
 const AuthRoutes = require("./routes/AuthRoutes");
 const UserRoutes = require("./routes/UserRoutes");
 const AdminRoutes = require("./routes/AdminRoute");
-const CashfreeController = require("./controllers/Payments/CashfreeController");
+const PaymentRoutes = require("./routes/PaymentRoutes");
 
 const app = express();
 
-app.post(
-  "/payments/webhook",
-  express.raw({ type: "application/json" }), 
-  CashfreeController.webhook
-);
+/* ------------------- MUST BE ABOVE express.json() ------------------- */
+app.post("/payments/webhook", express.raw({ type: "application/json" }));
 
-
+// Body parser AFTER webhook
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ limit: "5mb", extended: true }));
+/* -------------------------------------------------------------------- */
 
 app.use(
   cors({
-    origin: "*", 
+    origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
   })
 );
-
 
 let imagekit = null;
 
@@ -57,17 +54,14 @@ app.get("/image-kit-auth", (_req, res) => {
   }
 });
 
-
 app.use("/auth", AuthRoutes);
 app.use("/user", UserRoutes);
 app.use("/admin", AdminRoutes);
-
-app.use("/payments", require("./routes/PaymentRoutes"));
+app.use("/payments", PaymentRoutes);
 
 app.get("/", (req, res) => {
   res.send("Welcome to BICCSL Server ");
 });
-
 
 const PORT = process.env.PORT || 5051;
 app.listen(PORT, () => {

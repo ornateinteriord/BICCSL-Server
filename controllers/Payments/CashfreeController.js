@@ -5,7 +5,7 @@ const MemberModel = require("../../models/Users/Member");
 const PaymentModel = require("../../models/Payments/Payment");
 
 // Cashfree API Base URLs
-const CASHFREE_BASE = process.env.NODE_ENV === "production" 
+const CASHFREE_BASE = process.env.NODE_ENV === "PROD" 
   ? "https://api.cashfree.com" 
   : "https://sandbox.cashfree.com";
 const X_API_VERSION = "2022-09-01";
@@ -250,12 +250,12 @@ exports.createOrder = async (req, res) => {
     let frontendUrl = cleanUrl(process.env.FRONTEND_URL) || 'http://localhost:5173';
 
     // For Cashfree production environment, ensure HTTPS
-    if (process.env.NODE_ENV === "production" && frontendUrl.startsWith("http://")) {
+    if (process.env.NODE_ENV === "PROD" && frontendUrl.startsWith("http://")) {
       frontendUrl = frontendUrl.replace("http://", "https://");
     }
-    
-    // Append query parameters
-    returnUrl += `?payment_status={order_status}&order_id={order_id}&member_id=${memberId}`;
+
+    // Build return URL with query parameters
+    let returnUrl = `${frontendUrl}/user/dashboard?payment_status={order_status}&order_id={order_id}&member_id=${memberId}`;
     
     // Handle notify URL (webhook) - use HTTPS for production, HTTP for local development
     let backendUrl = process.env.BACKEND_URL || 'http://localhost:5051';
@@ -265,7 +265,7 @@ exports.createOrder = async (req, res) => {
     let notifyUrl = `${backendUrl}/payments/webhook`;
     
     // For Cashfree production environment, ensure HTTPS
-    if (process.env.NODE_ENV === "production" && backendUrl.startsWith("http://")) {
+    if (process.env.NODE_ENV === "PROD" && backendUrl.startsWith("http://")) {
       backendUrl = backendUrl.replace("http://", "https://");
     }
 
@@ -375,6 +375,8 @@ exports.createOrder = async (req, res) => {
       is_loan_repayment: true,
       member_id: memberId,
       member_name: member.Name,
+      // Tell frontend which Cashfree environment to use (must match backend)
+      cashfree_env: process.env.NODE_ENV === "PROD" ? "production" : "sandbox",
       loan_details: {
         current_due_amount: currentDueAmount,
         repayment_amount: amount,
@@ -498,25 +500,33 @@ exports.verifyPayment = async (req, res) => {
 
     // Call Cashfree API directly with correct endpoint
     const response = await axios.get(`${CASHFREE_BASE}/pg/orders/${orderId}`, { headers });
-    
+
     // Update our payment record
     payment.status = response.data.order_status;
     payment.rawResponse = response.data;
     await payment.save();
 
+    // Get payment time from payment details if available
+    const paymentTime = response.data.payment_details?.length > 0
+      ? response.data.payment_details[0]?.payment_time
+      : null;
+
+    // Response format matching frontend VerifyPaymentResponse interface
     res.json({
       success: true,
-      data: {
-        orderId: response.data.order_id,
-        status: response.data.order_status,
-        paymentDetails: response.data.payment_details || null
-      }
+      message: `Payment ${response.data.order_status === 'PAID' ? 'successful' : 'status: ' + response.data.order_status}`,
+      payment_status: response.data.order_status,
+      order_id: response.data.order_id,
+      amount: response.data.order_amount,
+      payment_time: paymentTime
     });
   } catch (error) {
     console.error("Error verifying payment:", error);
     res.status(500).json({
       success: false,
       message: "Failed to verify payment",
+      payment_status: "FAILED",
+      order_id: req.params.orderId,
       error: error.message
     });
   }

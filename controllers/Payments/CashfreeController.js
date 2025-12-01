@@ -10,12 +10,6 @@ const CASHFREE_BASE = process.env.NODE_ENV === "production"
   : "https://sandbox.cashfree.com";
 const X_API_VERSION = "2022-09-01";
 
-const CASHFREE_BASE = process.env.NODE_ENV === "production"
-  ? "https://api.cashfree.com/pg"
-  : "https://sandbox.cashfree.com/pg";
-const X_API_VERSION = "2025-01-01";
-
-
 // Helper function to process loan repayment (called ONLY after payment success)
 async function processLoanRepayment(paymentTransaction, _data) {
   try {
@@ -274,8 +268,6 @@ exports.createOrder = async (req, res) => {
     if (process.env.NODE_ENV === "production" && backendUrl.startsWith("http://")) {
       backendUrl = backendUrl.replace("http://", "https://");
     }
-
-    const notifyUrl = `${backendUrl}/payments/webhook`;
 
     const cashfreeBody = {
       order_amount: amount,

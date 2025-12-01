@@ -10,15 +10,13 @@ const CASHFREE_BASE = process.env.NODE_ENV === "production"
 const X_API_VERSION = "2025-01-01";
 
 // Helper function to process loan repayment (called ONLY after payment success)
-async function processLoanRepayment(paymentTransaction, data) {
+async function processLoanRepayment(paymentTransaction, _data) {
   try {
     console.log("🔄 Starting loan repayment processing...");
 
     const {
       member_id,
-      current_due_amount,
       new_due_amount,
-      requested_amount,
       original_loan_id
     } = paymentTransaction.repayment_context;
 

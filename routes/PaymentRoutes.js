@@ -20,10 +20,9 @@ const router = express.Router();
 router.post("/create-order", createOrder);
 router.get("/verify-payment/:orderId", verifyPayment);
 router.get("/incomplete-payments/:memberId", getIncompletePayment);
-router.post("/webhook", handleWebhook);
 router.post("/retry-payment", retryPayment);
 
-// Webhook - uses raw body for signature verification
+// Webhook - uses raw body for signature verification (IMPORTANT: raw body needed for signature)
 router.post("/webhook", express.raw({ type: 'application/json' }), handleWebhook);
 
 // Payment status and redirect

@@ -20,6 +20,7 @@ const router = express.Router();
 router.post("/create-order", createOrder);
 router.get("/verify-payment/:orderId", verifyPayment);
 router.get("/incomplete-payments/:memberId", getIncompletePayment);
+router.post("/webhook", handleWebhook);
 router.post("/retry-payment", retryPayment);
 
 // Webhook - uses raw body for signature verification

@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const PaymentSchema = new mongoose.Schema(
   {
     member: { type: mongoose.Schema.Types.ObjectId, ref: "member_tbl" },
-    memberId: { type: String },
+    memberId: { type: String, index: true },
     orderId: { type: String, index: true, unique: true },
     cfOrderId: { type: String },
     paymentSessionId: { type: String },
@@ -22,6 +22,7 @@ const PaymentSchema = new mongoose.Schema(
         "FAILED",
         "USER_DROPPED",
         "VOID",
+        "PARTIALLY_PAID",
       ],
       default: "CREATED",
     },
@@ -35,9 +36,29 @@ const PaymentSchema = new mongoose.Schema(
     rawResponse: { type: mongoose.Schema.Types.Mixed },
     paymentInfo: { type: mongoose.Schema.Types.Mixed },
     notes: { type: mongoose.Schema.Types.Mixed },
+
+    // Payment verification fields
+    verifiedAmount: { type: Number },
+    amountMismatch: { type: Boolean, default: false },
+
+    // Webhook tracking
+    webhookReceived: { type: Boolean, default: false },
+    webhookReceivedAt: { type: Date },
+
+    // Payment method details from Cashfree
+    paymentMethod: { type: String },
+    bankReference: { type: String },
+
+    // Error tracking
+    errorMessage: { type: String },
+    errorCode: { type: String },
   },
   { timestamps: true }
 );
+
+// Index for faster queries
+PaymentSchema.index({ memberId: 1, status: 1 });
+PaymentSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model("Payment", PaymentSchema);
 

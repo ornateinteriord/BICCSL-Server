@@ -4,10 +4,11 @@ const TransactionModel = require("../../models/Transaction/Transaction");
 const MemberModel = require("../../models/Users/Member");
 const PaymentModel = require("../../models/Payments/Payment");
 
+// Cashfree API Base URLs
 const CASHFREE_BASE = process.env.NODE_ENV === "production" 
-  ? "https://api.cashfree.com/pg" 
-  : "https://sandbox.cashfree.com/pg";
-const X_API_VERSION = "2025-01-01";
+  ? "https://api.cashfree.com" 
+  : "https://sandbox.cashfree.com";
+const X_API_VERSION = "2022-09-01";
 
 // Helper function to process loan repayment
 async function processLoanRepayment(paymentTransaction, data) {
@@ -256,7 +257,7 @@ exports.createOrder = async (req, res) => {
     returnUrl += `?payment_status={order_status}&order_id={order_id}&member_id=${memberId}`;
     
     // Handle notify URL (webhook) - use HTTPS for production, HTTP for local development
-    let backendUrl = process.env.BACKEND_URL || 'http://localhost:5173';
+    let backendUrl = process.env.BACKEND_URL || 'http://localhost:5051';
     // Remove any comments from the URL
     backendUrl = backendUrl.split(' ')[0].split('//')[0] + '//' + backendUrl.split(' ')[0].split('//')[1];
     
@@ -283,14 +284,15 @@ exports.createOrder = async (req, res) => {
     };
 
     console.log("🚀 Sending to Cashfree:", {
-      url: `${CASHFREE_BASE}/orders`,
+      url: `${CASHFREE_BASE}/pg/orders`,
       amount: amount,
       customer_id: memberId,
       return_url: returnUrl,
       notify_url: notifyUrl
     });
 
-    const response = await axios.post(`${CASHFREE_BASE}/orders`, cashfreeBody, { 
+    // Call Cashfree API directly with correct endpoint
+    const response = await axios.post(`${CASHFREE_BASE}/pg/orders`, cashfreeBody, { 
       headers,
       timeout: 10000 
     });
@@ -493,7 +495,8 @@ exports.verifyPayment = async (req, res) => {
       "x-client-secret": CASHFREE_SECRET_KEY,
     };
 
-    const response = await axios.get(`${CASHFREE_BASE}/orders/${orderId}`, { headers });
+    // Call Cashfree API directly with correct endpoint
+    const response = await axios.get(`${CASHFREE_BASE}/pg/orders/${orderId}`, { headers });
     
     // Update our payment record
     payment.status = response.data.order_status;
@@ -705,7 +708,8 @@ exports.retryPayment = async (req, res) => {
       order_id: orderId
     };
 
-    const response = await axios.post(`${CASHFREE_BASE}/orders/${orderId}/retry`, retryBody, { headers });
+    // Call Cashfree API directly with correct endpoint
+    const response = await axios.post(`${CASHFREE_BASE}/pg/orders/${orderId}/retry`, retryBody, { headers });
     
     // Update payment record
     payment.paymentSessionId = response.data.payment_session_id;

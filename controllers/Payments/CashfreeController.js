@@ -10,24 +10,33 @@ const CASHFREE_BASE = process.env.NODE_ENV === "production"
   : "https://sandbox.cashfree.com";
 const X_API_VERSION = "2022-09-01";
 
-// Helper function to process loan repayment
-async function processLoanRepayment(paymentTransaction, data) {
+const CASHFREE_BASE = process.env.NODE_ENV === "production"
+  ? "https://api.cashfree.com/pg"
+  : "https://sandbox.cashfree.com/pg";
+const X_API_VERSION = "2025-01-01";
+
+
+// Helper function to process loan repayment (called ONLY after payment success)
+async function processLoanRepayment(paymentTransaction, _data) {
   try {
     console.log("🔄 Starting loan repayment processing...");
-    
-    const { 
+
+    const {
       member_id,
-      current_due_amount,
       new_due_amount,
       original_loan_id
     } = paymentTransaction.repayment_context;
 
     const loanTransaction = await TransactionModel.findById(original_loan_id);
-    
+
     if (!loanTransaction) {
       console.warn("⚠️ Original loan transaction not found:", original_loan_id);
       return;
     }
+
+    // Update the loan's net_amount (remaining due) - THIS IS THE ACTUAL UPDATE
+    loanTransaction.net_amount = new_due_amount.toFixed(2);
+    loanTransaction.last_repayment_date = new Date().toISOString();
 
     if (new_due_amount <= 0) {
       loanTransaction.repayment_status = "Paid";
@@ -56,35 +65,34 @@ async function processLoanRepayment(paymentTransaction, data) {
   }
 }
 
-// Helper function to revert loan repayment
-async function revertLoanRepayment(paymentTransaction, data) {
+// Helper function to revert loan repayment (kept for backward compatibility)
+// Note: With the new flow where loan is only updated after payment success,
+// this function is rarely needed, but kept for edge cases and manual intervention
+async function revertLoanRepayment(paymentTransaction, _data) {
   try {
     console.log("🔄 Reverting loan repayment due to payment failure...");
-    
-    const { 
-      member_id,
-      current_due_amount,
-      requested_amount,
-      original_loan_id
-    } = paymentTransaction.repayment_context;
+
+    const { current_due_amount, original_loan_id } = paymentTransaction.repayment_context || {};
+
+    if (!original_loan_id) {
+      console.warn("⚠️ No original_loan_id in repayment_context, nothing to revert");
+      return;
+    }
 
     const loanTransaction = await TransactionModel.findById(original_loan_id);
-    
+
     if (!loanTransaction) {
       console.warn("⚠️ Original loan transaction not found:", original_loan_id);
       return;
     }
 
-    loanTransaction.net_amount = current_due_amount.toFixed(2);
-    
-    if (current_due_amount <= 0) {
-      loanTransaction.repayment_status = "Paid";
-    } else {
-      loanTransaction.repayment_status = "Unpaid";
+    // Restore the original due amount
+    if (current_due_amount !== undefined) {
+      loanTransaction.net_amount = current_due_amount.toFixed(2);
+      loanTransaction.repayment_status = current_due_amount <= 0 ? "Paid" : "Unpaid";
+      await loanTransaction.save();
+      console.log("✅ Loan transaction reverted successfully");
     }
-
-    await loanTransaction.save();
-    console.log("✅ Loan transaction reverted successfully");
 
     console.log("✅ Loan repayment reversal completed");
   } catch (error) {
@@ -98,10 +106,10 @@ exports.createOrder = async (req, res) => {
   try {
     console.log("🟢 CREATE ORDER STARTED =====================");
     console.log("📦 Request Body:", JSON.stringify(req.body, null, 2));
-    
+
     // Extract data from request body
-    const { 
-      amount, 
+    const {
+      amount,
       currency = "INR",
       customer,
       notes = {}
@@ -137,7 +145,7 @@ exports.createOrder = async (req, res) => {
 
     console.log("🔍 Searching for member in database...");
     const member = await MemberModel.findOne({ Member_id: memberId });
-    
+
     if (!member) {
       console.log("❌ Member not found in database");
       return res.status(404).json({
@@ -160,7 +168,7 @@ exports.createOrder = async (req, res) => {
     // For loan repayment, validate loan details and calculate new due amount
     if (isLoanRepayment) {
       console.log("💰 Loan repayment flow activated");
-      
+
       loanTransaction = await TransactionModel.findOne({
         member_id: memberId,
         transaction_type: "Reward Loan Request",
@@ -177,7 +185,7 @@ exports.createOrder = async (req, res) => {
 
       currentDueAmount = parseFloat(loanTransaction.net_amount) || parseFloat(loanTransaction.ew_credit) || 0;
       console.log("💳 Current due amount:", currentDueAmount);
-      
+
       if (currentDueAmount <= 0) {
         console.log("❌ Loan already repaid");
         return res.status(400).json({
@@ -201,23 +209,16 @@ exports.createOrder = async (req, res) => {
         new_due: newDueAmount
       });
 
-      console.log("🔄 Updating original loan transaction net_amount...");
-      loanTransaction.net_amount = newDueAmount.toFixed(2);
-      loanTransaction.repayment_status = newDueAmount <= 0 ? "Paid" : "Partially Paid";
-      loanTransaction.last_repayment_date = new Date().toISOString();
-      
-      await loanTransaction.save();
-      console.log("✅ Original loan transaction updated successfully:", {
-        transaction_id: loanTransaction.transaction_id,
-        new_net_amount: loanTransaction.net_amount,
-        repayment_status: loanTransaction.repayment_status
-      });
+      // NOTE: We do NOT update the loan here anymore!
+      // Loan will only be updated after successful payment confirmation via webhook
+      // This prevents inconsistent state if payment fails or user abandons
+      console.log("📝 Loan update will be processed after payment confirmation via webhook");
     }
 
     console.log("🔑 Checking Cashfree credentials...");
     const CASHFREE_APP_ID = process.env.CASHFREE_APP_ID;
     const CASHFREE_SECRET_KEY = process.env.CASHFREE_SECRET_KEY;
-    
+
     if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
       console.error("❌ Missing Cashfree credentials");
       return res.status(500).json({
@@ -241,16 +242,22 @@ exports.createOrder = async (req, res) => {
       "x-client-secret": CASHFREE_SECRET_KEY,
     };
 
-    // Handle return URL - use HTTPS for production, HTTP for local development
-    let frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    // Remove any comments from the URL
-    frontendUrl = frontendUrl.split(' ')[0].split('//')[0] + '//' + frontendUrl.split(' ')[0].split('//')[1];
-    
-    let returnUrl = `${frontendUrl}/user/dashboard`;
-    
+    // Helper function to clean and validate URL
+    const cleanUrl = (url) => {
+      if (!url) return null;
+      // Remove any trailing comments or whitespace
+      let cleaned = url.split(' ')[0].trim();
+      // Ensure URL doesn't have trailing slash
+      cleaned = cleaned.replace(/\/+$/, '');
+      return cleaned;
+    };
+
+    // Handle return URL - use HTTPS for production
+    let frontendUrl = cleanUrl(process.env.FRONTEND_URL) || 'http://localhost:5173';
+
     // For Cashfree production environment, ensure HTTPS
-    if (process.env.NODE_ENV === "production" && returnUrl.startsWith("http://")) {
-      returnUrl = returnUrl.replace("http://", "https://");
+    if (process.env.NODE_ENV === "production" && frontendUrl.startsWith("http://")) {
+      frontendUrl = frontendUrl.replace("http://", "https://");
     }
     
     // Append query parameters
@@ -264,10 +271,12 @@ exports.createOrder = async (req, res) => {
     let notifyUrl = `${backendUrl}/payments/webhook`;
     
     // For Cashfree production environment, ensure HTTPS
-    if (process.env.NODE_ENV === "production" && notifyUrl.startsWith("http://")) {
-      notifyUrl = notifyUrl.replace("http://", "https://");
+    if (process.env.NODE_ENV === "production" && backendUrl.startsWith("http://")) {
+      backendUrl = backendUrl.replace("http://", "https://");
     }
-    
+
+    const notifyUrl = `${backendUrl}/payments/webhook`;
+
     const cashfreeBody = {
       order_amount: amount,
       order_currency: currency,
@@ -294,9 +303,9 @@ exports.createOrder = async (req, res) => {
     // Call Cashfree API directly with correct endpoint
     const response = await axios.post(`${CASHFREE_BASE}/pg/orders`, cashfreeBody, { 
       headers,
-      timeout: 10000 
+      timeout: 10000
     });
-    
+
     console.log("✅ Cashfree response received:", {
       order_id: response.data.order_id,
       payment_session_id: response.data.payment_session_id,
@@ -386,17 +395,17 @@ exports.createOrder = async (req, res) => {
 
     console.log("📤 Sending success response to client");
     res.json(responseData);
-    
+
   } catch (error) {
     console.error("❌ ERROR IN CREATE ORDER =====================");
     console.error("Error name:", error.name);
     console.error("Error message:", error.message);
-    
+
     if (error.response) {
       console.error("🚨 Cashfree API Error:");
       console.error("Status:", error.response.status);
       console.error("Data:", JSON.stringify(error.response.data, null, 2));
-      
+
       if (error.response.status === 401) {
         return res.status(500).json({
           success: false,
@@ -406,7 +415,7 @@ exports.createOrder = async (req, res) => {
           solution: "Verify your CASHFREE_APP_ID and CASHFREE_SECRET_KEY are correct for production environment"
         });
       }
-      
+
       if (error.response.status === 400) {
         return res.status(400).json({
           success: false,
@@ -414,7 +423,7 @@ exports.createOrder = async (req, res) => {
           error: error.response.data?.message || "Bad request to payment service"
         });
       }
-      
+
       // Handle payment_session_id_invalid error specifically
       if (error.response.data?.code === "payment_session_id_invalid") {
         return res.status(400).json({
@@ -423,7 +432,7 @@ exports.createOrder = async (req, res) => {
           error: error.response.data
         });
       }
-      
+
       // Handle return_url_invalid error specifically
       if (error.response.data?.code === "order_meta.return_url_invalid") {
         return res.status(400).json({
@@ -433,7 +442,7 @@ exports.createOrder = async (req, res) => {
           solution: "Ensure your FRONTEND_URL environment variable uses HTTPS in production"
         });
       }
-      
+
       // Handle notify_url_invalid error specifically
       if (error.response.data?.code === "order_meta.notify_url_invalid") {
         return res.status(400).json({
@@ -444,7 +453,7 @@ exports.createOrder = async (req, res) => {
         });
       }
     }
-    
+
     res.status(500).json({
       success: false,
       message: "Failed to create payment order",
@@ -459,7 +468,7 @@ exports.createOrder = async (req, res) => {
 exports.verifyPayment = async (req, res) => {
   try {
     const { orderId } = req.params;
-    
+
     if (!orderId) {
       return res.status(400).json({
         success: false,
@@ -469,7 +478,7 @@ exports.verifyPayment = async (req, res) => {
 
     // Check if payment exists in our database
     const payment = await PaymentModel.findOne({ orderId: orderId });
-    
+
     if (!payment) {
       return res.status(404).json({
         success: false,
@@ -480,7 +489,7 @@ exports.verifyPayment = async (req, res) => {
     // Get payment status from Cashfree
     const CASHFREE_APP_ID = process.env.CASHFREE_APP_ID;
     const CASHFREE_SECRET_KEY = process.env.CASHFREE_SECRET_KEY;
-    
+
     if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
       return res.status(500).json({
         success: false,
@@ -525,7 +534,7 @@ exports.verifyPayment = async (req, res) => {
 exports.getIncompletePayment = async (req, res) => {
   try {
     const { memberId } = req.params;
-    
+
     if (!memberId) {
       return res.status(400).json({
         success: false,
@@ -558,7 +567,7 @@ exports.handleWebhook = async (req, res) => {
   try {
     console.log("🟢 WEBHOOK RECEIVED =====================");
     console.log("📦 Webhook Headers:", req.headers);
-    
+
     const signature = req.headers["x-webhook-signature"];
     const timestamp = req.headers["x-webhook-timestamp"];
     const secret = process.env.CASHFREE_SECRET_KEY;
@@ -568,10 +577,17 @@ exports.handleWebhook = async (req, res) => {
       return res.status(400).send("Missing signature or timestamp");
     }
 
-    // For raw body handling (make sure your express app is configured to handle raw body)
-    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    // Handle raw body - ensure we have the exact string that was signed
+    let rawBody;
+    if (Buffer.isBuffer(req.body)) {
+      rawBody = req.body.toString('utf8');
+    } else if (typeof req.body === 'string') {
+      rawBody = req.body;
+    } else {
+      rawBody = JSON.stringify(req.body);
+    }
     console.log("📄 Raw webhook body:", rawBody);
-    
+
     const payload = `${timestamp}${rawBody}`;
     const genSig = crypto.createHmac("sha256", secret).update(payload).digest("base64");
 
@@ -582,46 +598,92 @@ exports.handleWebhook = async (req, res) => {
       return res.status(401).send("Invalid signature");
     }
 
-    const data = typeof req.body === 'object' ? req.body : JSON.parse(rawBody);
+    const data = typeof req.body === 'object' && !Buffer.isBuffer(req.body)
+      ? req.body
+      : JSON.parse(rawBody);
     console.log("✅ Verified webhook data:", JSON.stringify(data, null, 2));
 
-    const paymentTransaction = await TransactionModel.findOne({ 
-      transaction_id: data.data?.order_id || data.order_id 
+    const orderId = data.data?.order?.order_id || data.data?.order_id || data.order_id;
+
+    const paymentTransaction = await TransactionModel.findOne({
+      transaction_id: orderId
     });
 
     if (!paymentTransaction) {
-      console.warn("❌ Transaction not found for order:", data.data?.order_id || data.order_id);
+      console.warn("❌ Transaction not found for order:", orderId);
       return res.status(404).send("Transaction not found");
+    }
+
+    // IDEMPOTENCY CHECK - Prevent duplicate processing
+    if (paymentTransaction.webhook_processed) {
+      console.log("⚠️ Webhook already processed for order:", orderId);
+      return res.status(200).json({
+        success: true,
+        message: "Webhook already processed",
+        order_id: orderId
+      });
     }
 
     console.log("✅ Payment transaction found:", {
       transaction_id: paymentTransaction.transaction_id,
       member_id: paymentTransaction.member_id,
-      is_loan_repayment: paymentTransaction.is_loan_repayment
+      is_loan_repayment: paymentTransaction.is_loan_repayment,
+      expected_amount: paymentTransaction.ew_debit
     });
 
-    const orderStatus = data.data?.order_status || data.order_status;
+    const orderStatus = data.data?.order?.order_status || data.data?.order_status || data.order_status;
     const isSuccessful = orderStatus === "PAID";
     const status = isSuccessful ? "Completed" : "Failed";
 
-    paymentTransaction.status = status;
-    paymentTransaction.description = `Payment ${orderStatus} - ${data.data?.payment_message || data.payment_message || ''}`;
-    
+    // AMOUNT VERIFICATION - Critical security check
     if (data.data?.payment || data.payment) {
       const paymentData = data.data?.payment || data.payment;
+      const receivedAmount = parseFloat(paymentData.payment_amount);
+      const expectedAmount = parseFloat(paymentTransaction.ew_debit);
+
+      console.log("💰 Amount verification:", {
+        received: receivedAmount,
+        expected: expectedAmount
+      });
+
+      // Verify amount matches (with small tolerance for floating point)
+      if (isSuccessful && Math.abs(receivedAmount - expectedAmount) > 0.01) {
+        console.error("❌ CRITICAL: Payment amount mismatch!", {
+          received: receivedAmount,
+          expected: expectedAmount,
+          difference: Math.abs(receivedAmount - expectedAmount)
+        });
+        // Log this for investigation but don't process
+        paymentTransaction.status = "Failed";
+        paymentTransaction.description = `Amount mismatch: received ₹${receivedAmount}, expected ₹${expectedAmount}`;
+        paymentTransaction.webhook_processed = true;
+        paymentTransaction.webhook_processed_at = new Date();
+        await paymentTransaction.save();
+        return res.status(400).json({
+          success: false,
+          message: "Payment amount mismatch - contact support",
+          order_id: orderId
+        });
+      }
+
       paymentTransaction.payment_details = {
         payment_method: paymentData.payment_method,
         bank_reference: paymentData.bank_reference,
         payment_time: paymentData.payment_time,
-        payment_amount: paymentData.payment_amount
+        payment_amount: receivedAmount
       };
     }
-    
+
+    paymentTransaction.status = status;
+    paymentTransaction.description = `Payment ${orderStatus} - ${data.data?.payment_message || data.payment_message || 'Processed'}`;
+    paymentTransaction.webhook_processed = true;
+    paymentTransaction.webhook_processed_at = new Date();
+
     await paymentTransaction.save();
     console.log("✅ Payment transaction updated with status:", status);
 
     // Update payment record in Payment collection
-    const paymentRecord = await PaymentModel.findOne({ orderId: data.data?.order_id || data.order_id });
+    const paymentRecord = await PaymentModel.findOne({ orderId: orderId });
     if (paymentRecord) {
       paymentRecord.status = orderStatus;
       paymentRecord.notifications.push(data);
@@ -629,19 +691,18 @@ exports.handleWebhook = async (req, res) => {
       await paymentRecord.save();
     }
 
+    // Process loan repayment ONLY after confirmed payment success
     if (isSuccessful && paymentTransaction.is_loan_repayment) {
-      console.log("💰 Processing loan repayment...");
+      console.log("💰 Processing loan repayment after confirmed payment...");
       await processLoanRepayment(paymentTransaction, data);
-    } else if (!isSuccessful && paymentTransaction.is_loan_repayment) {
-      console.log("🔄 Payment failed for loan repayment, reverting loan updates...");
-      await revertLoanRepayment(paymentTransaction, data);
     }
+    // Note: We no longer call revertLoanRepayment because loan is never pre-emptively updated
 
     console.log("✅ Webhook processing completed successfully");
-    res.status(200).json({ 
-      success: true, 
+    res.status(200).json({
+      success: true,
       message: "Webhook processed successfully",
-      order_id: data.data?.order_id || data.order_id,
+      order_id: orderId,
       status: orderStatus
     });
   } catch (err) {
@@ -659,7 +720,7 @@ exports.handleWebhook = async (req, res) => {
 exports.retryPayment = async (req, res) => {
   try {
     const { orderId } = req.body;
-    
+
     if (!orderId) {
       return res.status(400).json({
         success: false,
@@ -669,7 +730,7 @@ exports.retryPayment = async (req, res) => {
 
     // Find the payment record
     const payment = await PaymentModel.findOne({ orderId: orderId });
-    
+
     if (!payment) {
       return res.status(404).json({
         success: false,
@@ -688,7 +749,7 @@ exports.retryPayment = async (req, res) => {
     // Get Cashfree credentials
     const CASHFREE_APP_ID = process.env.CASHFREE_APP_ID;
     const CASHFREE_SECRET_KEY = process.env.CASHFREE_SECRET_KEY;
-    
+
     if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
       return res.status(500).json({
         success: false,
@@ -739,7 +800,7 @@ exports.retryPayment = async (req, res) => {
 exports.handlePaymentRedirect = async (req, res) => {
   try {
     const { order_id, order_status, member_id } = req.query;
-    
+
     if (!order_id || !order_status || !member_id) {
       return res.status(400).json({
         success: false,
@@ -749,7 +810,7 @@ exports.handlePaymentRedirect = async (req, res) => {
 
     // Find the payment record
     const payment = await PaymentModel.findOne({ orderId: order_id });
-    
+
     if (!payment) {
       return res.status(404).json({
         success: false,
@@ -763,7 +824,7 @@ exports.handlePaymentRedirect = async (req, res) => {
 
     // Find transaction record
     const transaction = await TransactionModel.findOne({ transaction_id: order_id });
-    
+
     if (transaction) {
       transaction.status = order_status === "PAID" ? "Completed" : "Failed";
       await transaction.save();
@@ -792,7 +853,7 @@ exports.handlePaymentRedirect = async (req, res) => {
 exports.checkPaymentStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
-    
+
     if (!orderId) {
       return res.status(400).json({
         success: false,
@@ -802,7 +863,7 @@ exports.checkPaymentStatus = async (req, res) => {
 
     // Find payment in our database
     const payment = await PaymentModel.findOne({ orderId: orderId });
-    
+
     if (!payment) {
       return res.status(404).json({
         success: false,
@@ -836,7 +897,7 @@ exports.raiseTicket = async (req, res) => {
   try {
     const { orderId, issueType, description } = req.body;
     const { memberId } = req.user; // Assuming user is authenticated
-    
+
     if (!orderId || !issueType || !description) {
       return res.status(400).json({
         success: false,
@@ -846,7 +907,7 @@ exports.raiseTicket = async (req, res) => {
 
     // Find the payment record
     const payment = await PaymentModel.findOne({ orderId: orderId });
-    
+
     if (!payment) {
       return res.status(404).json({
         success: false,
@@ -859,14 +920,14 @@ exports.raiseTicket = async (req, res) => {
     if (!payment.notes) {
       payment.notes = {};
     }
-    
+
     payment.notes.ticket = {
       issueType: issueType,
       description: description,
       raisedBy: memberId,
       raisedAt: new Date()
     };
-    
+
     await payment.save();
 
     res.json({
@@ -892,7 +953,7 @@ exports.raiseTicket = async (req, res) => {
 exports.saveIncompletePayment = async (req, res) => {
   try {
     const { orderId, paymentData } = req.body;
-    
+
     if (!orderId) {
       return res.status(400).json({
         success: false,
@@ -902,7 +963,7 @@ exports.saveIncompletePayment = async (req, res) => {
 
     // Find or create payment record
     let payment = await PaymentModel.findOne({ orderId: orderId });
-    
+
     if (!payment) {
       // Create new payment record for incomplete payment
       payment = new PaymentModel({
@@ -915,7 +976,7 @@ exports.saveIncompletePayment = async (req, res) => {
       payment.rawResponse = paymentData || payment.rawResponse;
       payment.status = payment.status === "PAID" ? payment.status : "PENDING";
     }
-    
+
     await payment.save();
 
     res.json({
@@ -937,7 +998,7 @@ exports.saveIncompletePayment = async (req, res) => {
 exports.processSuccessfulPayment = async (req, res) => {
   try {
     const { orderId } = req.body;
-    
+
     if (!orderId) {
       return res.status(400).json({
         success: false,
@@ -947,7 +1008,7 @@ exports.processSuccessfulPayment = async (req, res) => {
 
     // Find payment record
     const payment = await PaymentModel.findOne({ orderId: orderId });
-    
+
     if (!payment) {
       return res.status(404).json({
         success: false,
@@ -963,11 +1024,11 @@ exports.processSuccessfulPayment = async (req, res) => {
 
     // Find transaction record
     const transaction = await TransactionModel.findOne({ transaction_id: orderId });
-    
+
     if (transaction) {
       transaction.status = "Completed";
       await transaction.save();
-      
+
       // Process loan repayment if applicable
       if (transaction.is_loan_repayment) {
         await processLoanRepayment(transaction, {});
@@ -996,7 +1057,7 @@ exports.processSuccessfulPayment = async (req, res) => {
 exports.processFailedPayment = async (req, res) => {
   try {
     const { orderId } = req.body;
-    
+
     if (!orderId) {
       return res.status(400).json({
         success: false,
@@ -1006,7 +1067,7 @@ exports.processFailedPayment = async (req, res) => {
 
     // Find payment record
     const payment = await PaymentModel.findOne({ orderId: orderId });
-    
+
     if (!payment) {
       return res.status(404).json({
         success: false,
@@ -1022,11 +1083,11 @@ exports.processFailedPayment = async (req, res) => {
 
     // Find transaction record
     const transaction = await TransactionModel.findOne({ transaction_id: orderId });
-    
+
     if (transaction) {
       transaction.status = "Failed";
       await transaction.save();
-      
+
       // Revert loan repayment if applicable
       if (transaction.is_loan_repayment) {
         await revertLoanRepayment(transaction, {});
@@ -1076,7 +1137,7 @@ exports.processLoanRepayment = async (req, res) => {
     }
 
     await processLoanRepayment(paymentTransaction, {});
-    
+
     res.json({
       success: true,
       message: "Loan repayment processed successfully"
@@ -1115,7 +1176,7 @@ exports.revertLoanRepayment = async (req, res) => {
     }
 
     await revertLoanRepayment(paymentTransaction, {});
-    
+
     res.json({
       success: true,
       message: "Loan repayment reverted successfully"

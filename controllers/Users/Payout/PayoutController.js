@@ -25,7 +25,7 @@ const triggerMLMCommissions = async (req, res) => {
 
     // Find new member
     const newMember = await MemberModel.findOne({ Member_id: new_member_id });
-    console.log("📘 Found New Member:", newMember);
+    // console.log("📘 Found New Member:", newMember);
 
     if (!newMember) {
       return res.status(404).json({
@@ -52,9 +52,9 @@ const triggerMLMCommissions = async (req, res) => {
       });
     }
 
-    console.log(
-      `🚀 Triggering MLM commissions - New Member: ${new_member_id}, Direct Sponsor: ${Sponsor_code} -> ${sponsor.Member_id} (${sponsor.Name})`
-    );
+    // console.log(
+    //   `🚀 Triggering MLM commissions - New Member: ${new_member_id}, Direct Sponsor: ${Sponsor_code} -> ${sponsor.Member_id} (${sponsor.Name})`
+    // );
 
     // Update member's sponsor details if needed
     if (newMember.sponsor_id !== sponsor.Member_id) {

@@ -4,13 +4,28 @@ require("dotenv").config();
 const ImageKit = require("imagekit");
 require("./models/db");
 
+
 // routes
 const AuthRoutes = require("./routes/AuthRoutes");
 const UserRoutes = require("./routes/UserRoutes");
 const AdminRoutes = require("./routes/AdminRoute");
 const PaymentRoutes = require("./routes/PaymentRoutes");
+const KYCRoutes = require("./routes/KYCRoutes");
 
 const app = express();
+
+// Enable CORS early so preflight (OPTIONS) requests are handled before routes
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-client-id", "x-client-secret"],
+    credentials: true,
+  })
+);
+
+// Handle preflight for all routes
+app.options("*", cors());
 
 /* ------------------- MUST BE ABOVE express.json() ------------------- */
 app.post("/payments/webhook", express.raw({ type: "application/json" }));
@@ -19,14 +34,6 @@ app.post("/payments/webhook", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ limit: "5mb", extended: true }));
 /* -------------------------------------------------------------------- */
-
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    credentials: true,
-  })
-);
 
 let imagekit = null;
 
@@ -58,9 +65,10 @@ app.use("/auth", AuthRoutes);
 app.use("/user", UserRoutes);
 app.use("/admin", AdminRoutes);
 app.use("/payments", PaymentRoutes);
+app.use("/kyc", KYCRoutes);
 
 app.get("/", (req, res) => {
-  res.send("Welcome to BICCSL Server ");
+  res.send("Welcome to MSI Server ");
 });
 
 const PORT = process.env.PORT || 5051;

@@ -78,8 +78,8 @@ const findUplineSponsors = async (memberId, maxLevels = 10) => {
     currentMemberId = sponsor.Member_id;
   }
 
-  console.log(`📊 Found ${uplineSponsors.length} upline sponsors for member ${memberId}`);
-  return uplineSponsors;
+  // console.log(`📊 Found ${uplineSponsors.length} upline sponsors for member ${memberId}`);
+  // return uplineSponsors;
 };
 
 /**
@@ -104,7 +104,7 @@ const calculateCommissions = async (newMemberId, directSponsorId) => {
     const uplineSponsors = await findUplineSponsors(newMemberId, 10);
 
     if (uplineSponsors.length === 0) {
-      console.log(`⚠️ No upline sponsors found for member ${newMemberId}`);
+      // console.log(`⚠️ No upline sponsors found for member ${newMemberId}`);
       return [];
     }
 
@@ -114,7 +114,7 @@ const calculateCommissions = async (newMemberId, directSponsorId) => {
     for (const upline of uplineSponsors) {
       // Only active sponsors are eligible for commissions
       if (upline.sponsor_status !== 'active') {
-        console.log(`⚠️ Skipping Level ${upline.level} commission - Sponsor ${upline.sponsor_id} (${upline.sponsor_name}) is not active (${upline.sponsor_status})`);
+        // console.log(`⚠️ Skipping Level ${upline.level} commission - Sponsor ${upline.sponsor_id} (${upline.sponsor_name}) is not active (${upline.sponsor_status})`);
         continue;
       }
 
@@ -137,11 +137,11 @@ const calculateCommissions = async (newMemberId, directSponsorId) => {
 
         console.log(`✅ Level ${upline.level}: ${upline.sponsor_name} (${upline.sponsor_id}) gets ₹${commissionAmount} from ${newMemberId}`);
       } else {
-        console.log(`⚠️ No commission rate configured for Level ${upline.level}`);
+        // console.log(`⚠️ No commission rate configured for Level ${upline.level}`);
       }
     }
 
-    console.log(`💰 Total commissions calculated: ${commissions.length} for ${uplineSponsors.length} upline sponsors`);
+    // console.log(`💰 Total commissions calculated: ${commissions.length} for ${uplineSponsors.length} upline sponsors`);
     return commissions;
 
   } catch (error) {
@@ -160,7 +160,7 @@ const processCommissions = async (commissions) => {
   try {
     const results = [];
 
-    console.log(`🔄 Processing ${commissions.length} commissions...`);
+    // console.log(`🔄 Processing ${commissions.length} commissions...`);
 
     for (const commission of commissions) {
       try {
@@ -175,7 +175,7 @@ const processCommissions = async (commissions) => {
             sponsor_name: commission.sponsor_name,
             error: `Sponsor status is not active (${sponsor?.status || 'not found'})`
           });
-          console.log(`❌ Failed Level ${commission.level}: Sponsor ${commission.sponsor_id} not active`);
+          // console.log(`❌ Failed Level ${commission.level}: Sponsor ${commission.sponsor_id} not active`);
           continue;
         }
 
@@ -224,7 +224,7 @@ const processCommissions = async (commissions) => {
           transaction: transaction
         });
 
-        console.log(`✅ Commission processed: Level ${commission.level} - ${commission.sponsor_name} (${commission.sponsor_id}) received ₹${commission.amount}`);
+        // console.log(`✅ Commission processed: Level ${commission.level} - ${commission.sponsor_name} (${commission.sponsor_id}) received ₹${commission.amount}`);
 
       } catch (error) {
         console.error(`❌ Error processing commission for level ${commission.level} (${commission.sponsor_id}):`, error);
@@ -240,7 +240,7 @@ const processCommissions = async (commissions) => {
 
     const successful = results.filter(r => r.success).length;
     const failed = results.filter(r => !r.success).length;
-    console.log(`📊 Commission Processing Summary: ${successful} successful, ${failed} failed`);
+    // console.log(`📊 Commission Processing Summary: ${successful} successful, ${failed} failed`);
 
     return results;
 
@@ -303,7 +303,7 @@ const updateSponsorReferrals = async (sponsorId, newMemberId) => {
       }
     );
 
-    console.log(`✅ Updated referrals for ${sponsorId}: Added ${newMemberId}`);
+    // console.log(`✅ Updated referrals for ${sponsorId}: Added ${newMemberId}`);
 
   } catch (error) {
     console.error("❌ Error updating referrals:", error);

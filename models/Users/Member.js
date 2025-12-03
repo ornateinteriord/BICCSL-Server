@@ -53,7 +53,20 @@ const MemberSchema = new mongoose.Schema(
     profile_image : { type: String },
     sponsor_id: { type: String, default: null }, 
     direct_referrals: { type: [String], default: [] }, 
-    total_team: { type: Number, default: 0 }
+    total_team: { type: Number, default: 0 },
+    // KYC fields
+    kycStatus: {
+      type: String,
+      enum: ["PENDING", "APPROVED", "REJECTED"],
+      default: "PENDING"
+    },
+    // Cashfree beneficiary fields
+    beneficiaryId: { type: String },
+    beneficiaryStatus: {
+      type: String,
+      enum: ["NOT_CREATED","FAILED" ,"CREATED"],
+      default: "NOT_CREATED"
+    }
   },
   { timestamps: true, collection: "member_tbl" } 
 );

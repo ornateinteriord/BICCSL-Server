@@ -171,15 +171,32 @@ const getWalletWithdraw = async (req, res) => {
     }
 
     // Check if loan was taken BEFORE last Saturday
+    // New rule: if an active loan exists (net_amount > 0) AND the loan origination date is before lastSaturday
+    // then block withdrawal UNLESS there was a repayment on or after lastSaturday.
     let hasUnpaidLoan = false;
+    let lastRepayment = null;
     if (activeLoan) {
       const loanDate = new Date(activeLoan.transaction_date);
       console.log("Loan Date:", loanDate.toISOString());
       console.log("Last Saturday:", lastSaturday.toISOString());
-      
-      // If loan was taken before last Saturday and still unpaid, block withdrawal
-      hasUnpaidLoan = loanDate < lastSaturday;
-      console.log("Loan taken before last Saturday:", hasUnpaidLoan);
+
+      // Find the latest repayment (if any)
+      lastRepayment = await TransactionModel.findOne({
+        member_id: memberId,
+        transaction_type: { $regex: /repay|repayment|loan repayment/i },
+        status: { $in: ["Paid", "Completed", "Approved"] }
+      }).sort({ transaction_date: -1 }).exec();
+
+      if (lastRepayment) {
+        console.log("Last repayment found:", lastRepayment.transaction_date);
+      }
+
+      const unpaidNumeric = parseFloat(activeLoan.net_amount || "0") || 0;
+
+      // Block only if loan was taken before lastSaturday AND there was no repayment on/after lastSaturday AND unpaid amount > 0
+      const repaidOnOrAfterLastSaturday = lastRepayment && (new Date(lastRepayment.transaction_date) >= lastSaturday);
+      hasUnpaidLoan = loanDate < lastSaturday && unpaidNumeric > 0 && !repaidOnOrAfterLastSaturday;
+      console.log("Loan taken before last Saturday:", loanDate < lastSaturday, "unpaidNumeric:", unpaidNumeric, "repaidOnOrAfterLastSaturday:", repaidOnOrAfterLastSaturday, "hasUnpaidLoan:", hasUnpaidLoan);
     }
 
     const allTransactions = await TransactionModel.find({ member_id: memberId });

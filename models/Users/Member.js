@@ -57,7 +57,7 @@ const MemberSchema = new mongoose.Schema(
     // KYC fields
     kycStatus: {
       type: String,
-      enum: ["PENDING", "APPROVED", "REJECTED"],
+      enum: ["PENDING","PROCESSING", "APPROVED", "REJECTED"],
       default: "PENDING"
     },
     // Cashfree beneficiary fields

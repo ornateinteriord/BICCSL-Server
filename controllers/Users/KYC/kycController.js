@@ -3,7 +3,7 @@ const MemberModel = require("../../../models/Users/Member");
 // Submit KYC details
 exports.submitKYC = async (req, res) => {
   try {
-    const { ref_no, bankAccount, ifsc, pan, address } = req.body;
+    const { ref_no, bankAccount, ifsc, pan, address,bankName } = req.body;
 
     // Find the member by ref_no
     const member = await MemberModel.findOne({ Member_id: ref_no });
@@ -16,8 +16,9 @@ exports.submitKYC = async (req, res) => {
     member.account_number = bankAccount;
     member.ifsc_code = ifsc;
     member.Pan_no = pan;
+    member.bank_name=bankName;
     member.address = address;
-    member.kycStatus = "PENDING";
+    member.kycStatus = "PROCESSING";
 
     // Save the updated member
     await member.save();
@@ -56,36 +57,47 @@ exports.approveKYC = async (req, res) => {
 };
 
 // Get KYC submissions (default: PENDING)
+// Get KYC submissions (only PROCESSING)
 exports.getKycSubmissions = async (req, res) => {
   try {
-    const { status = "PENDING", q, page = 1, limit = 50 } = req.query;
+    const { q, page = 1, limit = 50 } = req.query;
 
-    const filter = {};
-    if (status) filter.kycStatus = status;
+    // Always fetch only PROCESSING KYCs
+    const filter = { kycStatus: "PROCESSING" };
 
+    // 🔍 Search filter
     if (q) {
       filter.$or = [
         { Member_id: q },
         { Name: { $regex: q, $options: "i" } },
-        { email: { $regex: q, $options: "i" } }
+        { email: { $regex: q, $options: "i" } },
+        { mobileno: { $regex: q, $options: "i" } }
       ];
     }
 
     const skip = (Math.max(parseInt(page, 10), 1) - 1) * parseInt(limit, 10);
+
     const submissions = await MemberModel.find(filter)
-      .select("Member_id Name mobileno email account_number ifsc_code kycStatus beneficiaryStatus beneficiaryId address createdAt updatedAt")
+      .select("Member_id Name mobileno email account_number ifsc_code bank_name Pan_no kycStatus beneficiaryStatus beneficiaryId address createdAt updatedAt")
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit, 10));
 
     const total = await MemberModel.countDocuments(filter);
 
-    res.json({ total, count: submissions.length, page: parseInt(page, 10), limit: parseInt(limit, 10), data: submissions });
+    res.json({
+      total,
+      count: submissions.length,
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+      data: submissions
+    });
   } catch (error) {
     console.error("Error fetching KYC submissions:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 // Auto create beneficiary in Cashfree
 async function autoCreateBeneficiary(user) {

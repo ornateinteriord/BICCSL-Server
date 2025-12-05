@@ -229,6 +229,15 @@ exports.createOrder = async (req, res) => {
       baseUrl: CASHFREE_BASE
     });
 
+    // Check if we're using test credentials in production environment
+    const isTestCredentials = CASHFREE_APP_ID.startsWith('TEST') || CASHFREE_SECRET_KEY.includes('test');
+    const isProductionEnv = process.env.NODE_ENV === "PROD";
+    
+    if (isProductionEnv && isTestCredentials) {
+      console.warn("⚠️ WARNING: Using TEST credentials in PRODUCTION environment!");
+      console.warn("This may cause authentication failures.");
+    }
+
     const headers = {
       "Content-Type": "application/json",
       "x-api-version": X_API_VERSION,
@@ -401,6 +410,21 @@ exports.createOrder = async (req, res) => {
       console.error("Data:", JSON.stringify(error.response.data, null, 2));
 
       if (error.response.status === 401) {
+        // Check if it's a credential mismatch issue
+        const isTestCredentials = process.env.CASHFREE_APP_ID?.startsWith('TEST') || 
+                                 process.env.CASHFREE_SECRET_KEY?.includes('test');
+        const isProductionEnv = process.env.NODE_ENV === "PROD";
+        
+        if (isProductionEnv && isTestCredentials) {
+          return res.status(500).json({
+            success: false,
+            message: "Payment service authentication failed.",
+            error: "Invalid Cashfree credentials",
+            details: error.response.data,
+            solution: "You're using TEST credentials in PRODUCTION environment. Either switch to production credentials or set NODE_ENV=development"
+          });
+        }
+        
         return res.status(500).json({
           success: false,
           message: "Payment service authentication failed.",

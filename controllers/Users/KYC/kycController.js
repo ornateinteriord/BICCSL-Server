@@ -12,6 +12,80 @@ exports.submitKYC = async (req, res) => {
       return res.status(404).json({ message: "Member not found" });
     }
 
+    // Verify bank details with Cashfree before saving
+    const axios = require("axios");
+    
+    try {
+      // First, authenticate with Cashfree to get Bearer token
+      const authResponse = await axios.post(
+        "https://payout-gamma.cashfree.com/payout/v1/authorize",
+        {},
+        {
+          headers: {
+            "X-Client-Id": process.env.CI_APP_ID,
+            "X-Client-Secret": process.env.CI_SECRET_KEY,
+            "Content-Type": "application/json",
+          }
+        }
+      );
+
+      // Log the auth response for debugging
+      console.log("Auth Response:", authResponse.data);
+
+      // Extract token from response
+      const bearerToken = authResponse.data?.data?.token || authResponse.data?.token;
+      
+      if (!bearerToken) {
+        console.error("Failed to extract token from auth response:", authResponse.data);
+        throw new Error("Failed to get authorization token from Cashfree");
+      }
+
+      console.log("Bearer Token:", bearerToken);
+
+      // Validate bank details using GET request with query parameters
+      // This is the correct way to validate bank details in Cashfree
+      console.log("Making bank validation request with params:", {
+        name: member.Name,
+        bankAccount: bankAccount,
+        ifsc: ifsc
+      });
+      
+      const validationResponse = await axios.get(
+        "https://payout-gamma.cashfree.com/payout/v1/validation/bankDetails",
+        {
+          params: {
+            name: member.Name,
+            bankAccount: bankAccount,
+            ifsc: ifsc
+          },
+          headers: {
+            "Authorization": `Bearer ${bearerToken}`,
+            "Content-Type": "application/json",
+          }
+        }
+      );
+
+      // Log the validation response for debugging
+      console.log("Validation Response:", validationResponse.data);
+
+      // Check if bank validation was successful
+      if (validationResponse.data.status !== "SUCCESS") {
+        return res.status(400).json({ 
+          message: "Bank account verification failed",
+          details: validationResponse.data.message || "Invalid bank details provided"
+        });
+      }
+      
+      // Log successful validation
+      console.log("Bank account verified successfully for member:", ref_no);
+    } catch (validationError) {
+      console.error("Bank validation error:", validationError.response?.data || validationError.message);
+      return res.status(400).json({ 
+        message: "Bank account verification failed",
+        details: validationError.response?.data?.message || "Could not verify bank details with payment provider"
+      });
+    }
+
     // Update member with KYC details
     member.account_number = bankAccount;
     member.ifsc_code = ifsc;
@@ -23,7 +97,7 @@ exports.submitKYC = async (req, res) => {
     // Save the updated member
     await member.save();
 
-    res.json({ message: "KYC submitted successfully" });
+    res.json({ message: "KYC submitted successfully with verified bank details" });
   } catch (error) {
     console.error("Error submitting KYC:", error);
     res.status(500).json({ message: "Internal server error" });

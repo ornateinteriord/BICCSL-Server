@@ -519,11 +519,12 @@ const repaymentLoan = async (req, res) => {
     }
 
     // Find the approved loan transaction
+    // Sort by _id descending to get the most recently created one (more reliable than transaction_date)
     let loanTransaction = await TransactionModel.findOne({
       member_id: memberId,
       transaction_type: "Reward Loan Request",
       status: "Approved",
-    }).sort({ transaction_date: -1 });
+    }).sort({ _id: -1 });
 
     if (!loanTransaction) {
       return res.status(404).json({
@@ -532,8 +533,44 @@ const repaymentLoan = async (req, res) => {
       });
     }
 
-    // Get current due amount
-    let currentDueAmount = parseFloat(loanTransaction.net_amount) || parseFloat(loanTransaction.ew_credit) || 0;
+    // Log loan transaction details for debugging
+    console.log("📋 Loan transaction details:", {
+      _id: loanTransaction._id,
+      transaction_id: loanTransaction.transaction_id,
+      reference_no: loanTransaction.reference_no,
+      net_amount: loanTransaction.net_amount,
+      ew_credit: loanTransaction.ew_credit,
+      transaction_date: loanTransaction.transaction_date,
+      repayment_status: loanTransaction.repayment_status
+    });
+
+    // Get the base due amount from the loan transaction
+    let baseDueAmount = parseFloat(loanTransaction.net_amount) || parseFloat(loanTransaction.ew_credit) || 0;
+    
+    // Find any pending repayment transactions for this loan to adjust the current due amount
+    // Note: For manual repayments, we're less likely to have pending transactions, but we'll check for consistency
+    const pendingRepayments = await TransactionModel.find({
+      member_id: memberId,
+      is_loan_repayment: true,
+      status: "Pending",
+      "repayment_context.original_loan_id": loanTransaction._id
+    });
+    
+    // Calculate total pending repayment amount
+    let pendingRepaymentAmount = 0;
+    pendingRepayments.forEach(repayment => {
+      pendingRepaymentAmount += parseFloat(repayment.repayment_context.requested_amount) || 0;
+    });
+    
+    // Adjust current due amount by subtracting pending repayments
+    currentDueAmount = baseDueAmount - pendingRepaymentAmount;
+    
+    console.log("💳 Current due amount calculation:", {
+      base_due_amount: baseDueAmount,
+      pending_repayments_count: pendingRepayments.length,
+      pending_repayment_amount: pendingRepaymentAmount,
+      adjusted_current_due: currentDueAmount
+    });
     
     if (currentDueAmount <= 0) {
       return res.status(400).json({
@@ -545,6 +582,13 @@ const repaymentLoan = async (req, res) => {
     // Calculate actual payment and new due amount
     const actualPayment = Math.min(amount, currentDueAmount);
     const newDueAmount = currentDueAmount - actualPayment;
+    
+    console.log("📊 Amount calculation:", {
+      current_due: currentDueAmount,
+      repayment_amount: actualPayment,
+      new_due: newDueAmount,
+      calculation: `${currentDueAmount} - ${actualPayment} = ${newDueAmount}`
+    });
 
     // Find member details
     const member = await MemberModel.findOne({ Member_id: memberId });
@@ -568,6 +612,13 @@ const repaymentLoan = async (req, res) => {
 
 
     // Update the original loan transaction
+    console.log("📋 Updating loan transaction:", {
+      _id: loanTransaction._id,
+      previous_net_amount: loanTransaction.net_amount,
+      new_net_amount: newDueAmount.toFixed(2),
+      previous_repayment_status: loanTransaction.repayment_status
+    });
+    
     loanTransaction.net_amount = newDueAmount.toFixed(2);
     loanTransaction.repayment_status = newDueAmount <= 0 ? "Paid" : "Partially Paid";
 

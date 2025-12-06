@@ -27,13 +27,9 @@ app.use(
 // Handle preflight for all routes
 app.options("*", cors());
 
-/* ------------------- MUST BE ABOVE express.json() ------------------- */
-app.post("/payments/webhook", express.raw({ type: "application/json" }));
-
-// Body parser AFTER webhook
+// Body parser
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ limit: "5mb", extended: true }));
-/* -------------------------------------------------------------------- */
 
 let imagekit = null;
 

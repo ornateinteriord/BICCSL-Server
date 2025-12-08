@@ -1,7 +1,7 @@
 // ====================== Imports ======================
 const express = require("express");
 const cors = require("cors");
-require("dotenv").config();
+require("dotenv").config()
 const ImageKit = require("imagekit");
 require("./models/db"); // Your Mongo DB connection file
 
@@ -12,16 +12,21 @@ const AdminRoutes = require("./routes/AdminRoute");
 const PaymentRoutes = require("./routes/PaymentRoutes");
 const KYCRoutes = require("./routes/KYCRoutes");
 
+// 🔐 CASHFREE WEBHOOK CONTROLLER
+const { handleWebhook } = require("./controllers/Payments/CashfreeController");
+
 const app = express();
 
 // ======================================================
 //        🛡️ CORS CONFIG (Supports Vite + ngrok)
 // ======================================================
 const allowedOrigins = [
-  process.env.FRONTEND_URL,       // your frontend URL from .env
-  "http://localhost:5173",        // Vite app
-  "http://localhost:3000"         // React default
+  process.env.FRONTEND_URL,
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://mscs-beige.vercel.app"  
 ].filter(Boolean);
+
 
 app.use(
   cors({
@@ -30,7 +35,7 @@ app.use(
 
       if (
         allowedOrigins.includes(origin) ||
-        origin.endsWith("ngrok-free.dev") // Auto allow new ngrok URL
+        origin?.endsWith("ngrok-free.dev") // Auto allow new ngrok URL
       ) {
         return callback(null, true);
       }
@@ -46,10 +51,20 @@ app.use(
 app.options("*", cors());
 
 // ======================================================
-//        📦 BODY PARSER
+// ⚠️ IMPORTANT: RAW BODY FOR CASHFREE WEBHOOK
+// ======================================================
+app.use("/webhook/cashfree", express.raw({ type: "*/*" }));
+
+// ======================================================
+//        📦 BODY PARSER (normal APIs)
 // ======================================================
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
+
+// ======================================================
+// 💳 CASHFREE WEBHOOK ROUTE (must come AFTER raw body)
+// ======================================================
+app.post("/webhook/cashfree", handleWebhook);
 
 // ======================================================
 //    📷 ImageKit Configuration (Optional but Secure)

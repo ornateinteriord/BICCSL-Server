@@ -17,7 +17,8 @@ async function processLoanRepayment(paymentTransaction, _data) {
 
     const {
       member_id,
-      new_due_amount,
+      requested_amount,
+      current_due_amount,
       original_loan_id
     } = paymentTransaction.repayment_context;
 
@@ -37,6 +38,18 @@ async function processLoanRepayment(paymentTransaction, _data) {
       repayment_status: loanTransaction.repayment_status
     });
 
+    // Calculate the new due amount based on the requested amount
+    const previousAmount = parseFloat(loanTransaction.net_amount);
+    const amountToDeduct = parseFloat(requested_amount);
+    const new_due_amount = previousAmount - amountToDeduct;
+
+    console.log("📊 Loan repayment calculation:", {
+      previous_amount: previousAmount,
+      amount_deducted: amountToDeduct,
+      new_due_amount: new_due_amount,
+      calculation: `${previousAmount} - ${amountToDeduct} = ${new_due_amount}`
+    });
+
     // Check if this repayment has already been processed to prevent double processing
     // This can happen if webhooks are sent multiple times
     const existingNetAmount = parseFloat(loanTransaction.net_amount);
@@ -54,7 +67,6 @@ async function processLoanRepayment(paymentTransaction, _data) {
     }
 
     // Update the loan's net_amount (remaining due) - THIS IS THE ACTUAL UPDATE
-    const previousAmount = loanTransaction.net_amount;
     loanTransaction.net_amount = new_due_amount.toFixed(2);
     loanTransaction.last_repayment_date = new Date().toISOString();
 
@@ -274,12 +286,12 @@ exports.createOrder = async (req, res) => {
         });
       }
 
-      newDueAmount = currentDueAmount - amount;
-      console.log("📊 Amount calculation:", {
-        current_due: currentDueAmount,
-        repayment_amount: amount,
-        new_due: newDueAmount,
-        calculation: `${currentDueAmount} - ${amount} = ${newDueAmount}`
+      // Remove the immediate calculation of newDueAmount
+      // newDueAmount = currentDueAmount - amount;
+      // Instead, we'll store the amount to be deducted for later use
+      const amountToDeduct = amount;
+      console.log("📊 Amount to be deducted (will be applied after webhook success):", {
+        repayment_amount: amountToDeduct
       });
 
       // NOTE: We do NOT update the loan here anymore!
@@ -439,12 +451,12 @@ exports.createOrder = async (req, res) => {
       transaction_id: response.data.order_id,
       transaction_date: new Date().toISOString(),
       member_id: memberId,
-      description: `Loan Repayment Payment of ₹${amount}. Remaining Due: ₹${newDueAmount.toFixed(2)}`,
+      description: `Loan Repayment Payment of ₹${amount}. Amount will be deducted after payment success.`,
       Name: member.Name,
       mobileno: member.mobileno,
       transaction_type: "Loan Repayment Payment",
       ew_debit: amount,
-      net_amount: newDueAmount,
+      // Don't set net_amount yet as it will be calculated after webhook success
       status: "Pending",
       reference_no: response.data.order_id,
       is_loan_repayment: true,
@@ -452,7 +464,7 @@ exports.createOrder = async (req, res) => {
         member_id: memberId,
         requested_amount: amount,
         current_due_amount: currentDueAmount,
-        new_due_amount: newDueAmount,
+        // Don't set new_due_amount yet as it will be calculated after webhook success
         member_name: member.Name,
         member_phone: member.mobileno,
         original_loan_id: loanTransaction?._id,
@@ -478,9 +490,9 @@ exports.createOrder = async (req, res) => {
       loan_details: {
         current_due_amount: currentDueAmount,
         repayment_amount: amount,
-        new_due_amount: newDueAmount,
-        repayment_status: newDueAmount <= 0 ? "Paid" : "Partially Paid",
-        original_loan_updated: true,
+        // Don't send new_due_amount as it will be calculated after webhook success
+        repayment_status: "Pending",
+        original_loan_updated: false,
         original_loan_id: loanTransaction?._id
       }
     };
@@ -764,64 +776,20 @@ exports.handleWebhook = async (req, res) => {
       
       // Different signature verification based on webhook version
       if (webhookVersion === "2023-08-01") {
-        // Newer version uses payload + timestamp
-        const payload = rawBody + timestamp;
+        // Newer version uses timestamp + payload (correct method per Cashfree docs)
+        const payload = timestamp + rawBody;
         genSig = crypto.createHmac("sha256", secret).update(payload).digest("base64");
-        console.log("🔐 Using 2023-08-01 signature method (payload + timestamp)");
+        console.log("🔐 Using 2023-08-01 signature method (timestamp + payload)");
       } else if (webhookVersion === "2021-09-21") {
-        // Older version uses timestamp + payload
+        // Older version uses timestamp + payload as well
         const payload = timestamp + rawBody;
         genSig = crypto.createHmac("sha256", secret).update(payload).digest("base64");
         console.log("🔐 Using 2021-09-21 signature method (timestamp + payload)");
       } else {
-        // Try multiple methods for unknown versions
-        console.log("🔐 Unknown webhook version, trying multiple methods...");
-        
-        // Method 1: timestamp + payload
-        const payload1 = timestamp + rawBody;
-        const genSig1 = crypto.createHmac("sha256", secret).update(payload1).digest("base64");
-        
-        // Method 2: payload + timestamp
-        const payload2 = rawBody + timestamp;
-        const genSig2 = crypto.createHmac("sha256", secret).update(payload2).digest("base64");
-        
-        // Method 3: Just payload (some versions might not use timestamp)
-        const genSig3 = crypto.createHmac("sha256", secret).update(rawBody).digest("base64");
-        
-        console.log("🔐 Trying signature methods:", {
-          method1: payload1.substring(0, 100) + "...",
-          method2: payload2.substring(0, 100) + "...",
-          method3: rawBody.substring(0, 100) + "..."
-        });
-        
-        // Check which one matches
-        if (genSig1 === signature) {
-          genSig = genSig1;
-          console.log("✅ Method 1 matched (timestamp + payload)");
-        } else if (genSig2 === signature) {
-          genSig = genSig2;
-          console.log("✅ Method 2 matched (payload + timestamp)");
-        } else if (genSig3 === signature) {
-          genSig = genSig3;
-          console.log("✅ Method 3 matched (payload only)");
-        } else {
-          // None matched, let's try some variations
-          console.log("🔐 No exact match, trying variations...");
-          
-          // Try with different encodings
-          const utf8Payload = Buffer.from(rawBody, 'utf8').toString();
-          const payloadUtf8 = timestamp + utf8Payload;
-          const genSigUtf8 = crypto.createHmac("sha256", secret).update(payloadUtf8).digest("base64");
-          
-          if (genSigUtf8 === signature) {
-            genSig = genSigUtf8;
-            console.log("✅ UTF-8 variation matched");
-          } else {
-            // Default to method 1 and continue (might be a temporary issue)
-            genSig = genSig1;
-            console.log("⚠️ No method matched, defaulting to method 1 for now");
-          }
-        }
+        // Default to the correct method per Cashfree docs
+        console.log("🔐 Unknown webhook version, using default method (timestamp + payload)");
+        const payload = timestamp + rawBody;
+        genSig = crypto.createHmac("sha256", secret).update(payload).digest("base64");
       }
 
       console.log("🔐 Signature Verification:", {
@@ -920,14 +888,14 @@ exports.handleWebhook = async (req, res) => {
     // Map Cashfree payment statuses to our internal statuses
     const statusMap = {
       "SUCCESS": "PAID",
-      "FAILED": "Failed",
-      "CANCELLED": "Cancelled",
-      "PENDING": "Pending"
+      "FAILED": "FAILED",  // Fixed: Use "FAILED" instead of "Failed" to match enum
+      "CANCELLED": "CANCELLED",  // Fixed: Use "CANCELLED" instead of "Cancelled"
+      "PENDING": "PENDING"  // Fixed: Use "PENDING" instead of "Pending"
     };
     
     const mappedStatus = statusMap[orderStatus] || orderStatus;
     const isSuccessful = mappedStatus === "PAID";
-    const status = isSuccessful ? "Completed" : "Failed";
+    const status = isSuccessful ? "Completed" : "Failed";  // Transaction status
     
     console.log("📊 Payment outcome evaluation:", {
       rawOrderStatus: orderStatus,
@@ -1007,7 +975,7 @@ exports.handleWebhook = async (req, res) => {
     // Update payment record in Payment collection
     const paymentRecord = await PaymentModel.findOne({ orderId: orderId });
     if (paymentRecord) {
-      paymentRecord.status = mappedStatus;
+      paymentRecord.status = mappedStatus;  // This should now match the enum
       if (!paymentRecord.notifications) paymentRecord.notifications = [];
       paymentRecord.notifications.push(data);
       paymentRecord.rawResponse = data;

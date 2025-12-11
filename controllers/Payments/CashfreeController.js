@@ -247,6 +247,8 @@ exports.createOrder = async (req, res) => {
       let baseDueAmount = parseFloat(loanTransaction.net_amount) || parseFloat(loanTransaction.ew_credit) || 0;
       
       // Find any pending repayment transactions for this loan to adjust the current due amount
+      // NOTE: We should only consider successfully completed payments when calculating current due
+      // Pending payments should not reduce the current due amount until they are confirmed successful
       const pendingRepayments = await TransactionModel.find({
         member_id: memberId,
         is_loan_repayment: true,
@@ -254,15 +256,23 @@ exports.createOrder = async (req, res) => {
         "repayment_context.original_loan_id": loanTransaction._id
       });
       
-      // Calculate total pending repayment amount
-      let pendingRepaymentAmount = 0;
-      pendingRepayments.forEach(repayment => {
-        pendingRepaymentAmount += parseFloat(repayment.repayment_context.requested_amount) || 0;
+      // Find any successfully completed repayment transactions for this loan
+      const completedRepayments = await TransactionModel.find({
+        member_id: memberId,
+        is_loan_repayment: true,
+        status: "Completed",
+        "repayment_context.original_loan_id": loanTransaction._id
       });
       
-      // Adjust current due amount by subtracting pending repayments
-      currentDueAmount = baseDueAmount - pendingRepaymentAmount;
+      // Calculate total completed repayment amount (these have been confirmed via webhook)
+      let completedRepaymentAmount = 0;
+      completedRepayments.forEach(repayment => {
+        completedRepaymentAmount += parseFloat(repayment.repayment_context.requested_amount) || 0;
+      });
       
+      // Adjust current due amount by subtracting only completed repayments
+      // Pending repayments do not affect the current due amount until confirmed successful
+      currentDueAmount = baseDueAmount - completedRepaymentAmount;      
       console.log("💳 Current due amount calculation:", {
         base_due_amount: baseDueAmount,
         pending_repayments_count: pendingRepayments.length,
@@ -470,7 +480,9 @@ exports.createOrder = async (req, res) => {
         original_loan_id: loanTransaction?._id,
         original_loan_reference: loanTransaction?.reference_no,
         original_loan_transaction_id: loanTransaction?.transaction_id
-      }
+      },
+    
+
     };
 
     await TransactionModel.create(transactionData);
@@ -965,7 +977,7 @@ exports.handleWebhook = async (req, res) => {
     }
 
     paymentTransaction.status = status;
-    paymentTransaction.description = `Payment ${mappedStatus} - ${data.data?.payment?.payment_message || data.payment_message || 'Processed'}`;
+    paymentTransaction.description = `Payment ${mappedStatus}}`;
     paymentTransaction.webhook_processed = true;
     paymentTransaction.webhook_processed_at = new Date();
 

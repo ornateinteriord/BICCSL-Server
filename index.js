@@ -22,21 +22,18 @@ const app = express();
 // ======================================================
 const allowedOrigins = [
   process.env.FRONTEND_URL,
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "https://mscs-beige.vercel.app"  
+  "https://mscs-beige.vercel.app"
 ].filter(Boolean);
-
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true); // Postman/mobile app support
+      if (!origin) return callback(null, true); // Postman / server-to-server
 
-      if (
-        allowedOrigins.includes(origin) ||
-        origin?.endsWith("ngrok-free.dev") // Auto allow new ngrok URL
-      ) {
+      const isLocalhost = /^http:\/\/localhost:\d+$/.test(origin);
+      const isNgrok = origin.endsWith("ngrok-free.dev");
+
+      if (isLocalhost || isNgrok || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 
@@ -47,6 +44,7 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
 
 app.options("*", cors());
 

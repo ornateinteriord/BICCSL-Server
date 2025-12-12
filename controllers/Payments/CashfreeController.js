@@ -148,13 +148,11 @@ async function revertLoanRepayment(paymentTransaction, _data) {
   }
 }
 
-// Create a new payment order
 exports.createOrder = async (req, res) => {
   try {
     console.log("🟢 CREATE ORDER STARTED =====================");
-    console.log("📦 Request Body:", JSON.stringify(req.body, null, 2));
+    console.log("📦 Request Body:", req.body);
 
-    // Extract data from request body
     const {
       amount,
       currency = "INR",
@@ -163,61 +161,29 @@ exports.createOrder = async (req, res) => {
     } = req.body;
 
     const memberId = customer?.customer_id;
-    const isLoanRepayment = notes?.isLoanRepayment !== false; // Default to true
+    const isLoanRepayment = notes?.isLoanRepayment !== false;
 
-    console.log("🔍 Extracted data:", {
-      amount,
-      memberId,
-      isLoanRepayment,
-      currency
-    });
-
-    // Validate amount
+    // -------- VALIDATIONS ----------
     if (!amount || amount <= 0) {
-      console.log("❌ Amount validation failed");
-      return res.status(400).json({
-        success: false,
-        message: "Valid payment amount is required.",
-      });
+      return res.status(400).json({ success: false, message: "Valid amount required" });
     }
-
-    // Validate memberId
     if (!memberId) {
-      console.log("❌ Member ID validation failed");
-      return res.status(400).json({
-        success: false,
-        message: "Member ID is required.",
-      });
+      return res.status(400).json({ success: false, message: "Member ID required" });
     }
 
-    console.log("🔍 Searching for member in database...");
+    // -------- MEMBER LOOKUP ----------
     const member = await MemberModel.findOne({ Member_id: memberId });
-
     if (!member) {
-      console.log("❌ Member not found in database");
-      return res.status(404).json({
-        success: false,
-        message: "Member not found.",
-      });
+      return res.status(404).json({ success: false, message: "Member not found" });
     }
 
-    console.log("✅ Member found:", {
-      Member_id: member.Member_id,
-      Name: member.Name,
-      email: member.email,
-      mobileno: member.mobileno
-    });
+    console.log("✅ Member found:", member.Member_id, member.Name);
 
-    let loanTransaction = null;
     let currentDueAmount = 0;
-    let newDueAmount = 0;
+    let loanTransaction = null;
 
-    // For loan repayment, validate loan details and calculate new due amount
+    // -------- LOAN REPAYMENT LOGIC ----------
     if (isLoanRepayment) {
-      console.log("💰 Loan repayment flow activated");
-
-      // Find the most recent approved loan transaction for this member
-      // Sort by _id descending to get the most recently created one (more reliable than transaction_date)
       loanTransaction = await TransactionModel.findOne({
         member_id: memberId,
         transaction_type: "Reward Loan Request",
@@ -225,375 +191,164 @@ exports.createOrder = async (req, res) => {
       }).sort({ _id: -1 });
 
       if (!loanTransaction) {
-        console.log("❌ No approved loan found");
         return res.status(404).json({
           success: false,
-          message: "No approved reward loan found for this member to repay.",
+          message: "No approved loan found to repay"
         });
       }
 
-      // Log loan transaction details for debugging
-      console.log("📋 Loan transaction details:", {
-        _id: loanTransaction._id,
-        transaction_id: loanTransaction.transaction_id,
-        reference_no: loanTransaction.reference_no,
-        net_amount: loanTransaction.net_amount,
-        ew_credit: loanTransaction.ew_credit,
-        transaction_date: loanTransaction.transaction_date,
-        repayment_status: loanTransaction.repayment_status
-      });
+      let baseDueAmount = parseFloat(loanTransaction.net_amount);
 
-      // Get the base due amount from the loan transaction
-      let baseDueAmount = parseFloat(loanTransaction.net_amount) || parseFloat(loanTransaction.ew_credit) || 0;
-      
-      // Find any pending repayment transactions for this loan to adjust the current due amount
-      // NOTE: We should only consider successfully completed payments when calculating current due
-      // Pending payments should not reduce the current due amount until they are confirmed successful
-      const pendingRepayments = await TransactionModel.find({
-        member_id: memberId,
-        is_loan_repayment: true,
-        status: "Pending",
-        "repayment_context.original_loan_id": loanTransaction._id
-      });
-      
-      // Find any successfully completed repayment transactions for this loan
       const completedRepayments = await TransactionModel.find({
         member_id: memberId,
         is_loan_repayment: true,
         status: "Completed",
         "repayment_context.original_loan_id": loanTransaction._id
       });
-      
-      // Calculate total completed repayment amount (these have been confirmed via webhook)
-      let completedRepaymentAmount = 0;
-      completedRepayments.forEach(repayment => {
-        completedRepaymentAmount += parseFloat(repayment.repayment_context.requested_amount) || 0;
-      });
-      
-      // Adjust current due amount by subtracting only completed repayments
-      // Pending repayments do not affect the current due amount until confirmed successful
-      currentDueAmount = baseDueAmount - completedRepaymentAmount;      
-      console.log("💳 Current due amount calculation:", {
-        base_due_amount: baseDueAmount,
-        pending_repayments_count: pendingRepayments.length,
-        pending_repayment_amount: pendingRepaymentAmount,
-        adjusted_current_due: currentDueAmount
-      });
+
+      let completedAmount = completedRepayments.reduce((sum, t) =>
+        sum + parseFloat(t.repayment_context.requested_amount || 0), 0);
+
+      currentDueAmount = baseDueAmount - completedAmount;
 
       if (currentDueAmount <= 0) {
-        console.log("❌ Loan already repaid");
         return res.status(400).json({
           success: false,
-          message: "Loan is already fully repaid.",
+          message: "Loan already fully repaid"
         });
       }
 
       if (amount > currentDueAmount) {
-        console.log("❌ Amount exceeds due amount");
         return res.status(400).json({
           success: false,
-          message: `Repayment amount cannot exceed due amount of ₹${currentDueAmount.toFixed(2)}.`,
+          message: `Cannot repay more than due amount ₹${currentDueAmount}`
         });
       }
 
-      // Remove the immediate calculation of newDueAmount
-      // newDueAmount = currentDueAmount - amount;
-      // Instead, we'll store the amount to be deducted for later use
-      const amountToDeduct = amount;
-      console.log("📊 Amount to be deducted (will be applied after webhook success):", {
-        repayment_amount: amountToDeduct
-      });
-
-      // NOTE: We do NOT update the loan here anymore!
-      // Loan will only be updated after successful payment confirmation via webhook
-      // This prevents inconsistent state if payment fails or user abandons
-      console.log("📝 Loan update will be processed after payment confirmation via webhook");
+      console.log("💰 Loan repayment validated. Due:", currentDueAmount);
     }
 
-    console.log("🔑 Checking Cashfree credentials...");
+    // -------- CASHFREE CONFIG ----------
     const CASHFREE_APP_ID = process.env.CASHFREE_APP_ID;
     const CASHFREE_SECRET_KEY = process.env.CASHFREE_SECRET_KEY;
 
     if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
-      console.error("❌ Missing Cashfree credentials");
       return res.status(500).json({
         success: false,
-        message: "Payment service configuration error.",
+        message: "Cashfree API keys missing"
       });
     }
 
-    // Log credential info (first 6 and last 4 chars only for security)
-    console.log("🔐 Credential Info:", {
-      appId: CASHFREE_APP_ID.substring(0, 6) + "..." + CASHFREE_APP_ID.substring(CASHFREE_APP_ID.length - 4),
-      secretKeyLength: CASHFREE_SECRET_KEY.length,
-      env: process.env.NODE_ENV,
-      baseUrl: CASHFREE_BASE
-    });
+    const CASHFREE_BASE =
+      process.env.NODE_ENV === "PROD"
+        ? "https://api.cashfree.com"
+        : "https://sandbox.cashfree.com";
 
-    // Check if we're using test credentials in production environment
-    const isTestCredentials = CASHFREE_APP_ID.startsWith('TEST') || CASHFREE_SECRET_KEY.includes('test');
-    const isProductionEnv = process.env.NODE_ENV === "PROD";
-    
-    if (isProductionEnv && isTestCredentials) {
-      console.warn("⚠️ WARNING: Using TEST credentials in PRODUCTION environment!");
-      console.warn("This may cause authentication failures.");
-    }
+    // -------- SAFE URL HANDLING ----------
+    let frontendUrl = (process.env.FRONTEND_URL || "").trim();
+    let backendUrl = (process.env.BACKEND_URL || "").trim();
 
-    const headers = {
-      "Content-Type": "application/json",
-      "x-api-version": X_API_VERSION,
-      "x-client-id": CASHFREE_APP_ID,
-      "x-client-secret": CASHFREE_SECRET_KEY,
-    };
+    if (!frontendUrl.startsWith("http")) frontendUrl = "http://" + frontendUrl;
+    if (!backendUrl.startsWith("http")) backendUrl = "https://" + backendUrl;
 
-    // Helper function to clean and validate URL
-    const cleanUrl = (url) => {
-      if (!url) return null;
-      // Remove any trailing comments or whitespace
-      let cleaned = url.split(' ')[0].trim();
-      // Ensure URL doesn't have trailing slash
-      cleaned = cleaned.replace(/\/+$/, '');
-      return cleaned;
-    };
+    const returnUrl =
+      `${frontendUrl}/user/dashboard?order_id={order_id}&order_status={order_status}&member_id=${memberId}`;
 
-    // Handle return URL - use HTTPS for production
-    let frontendUrl = cleanUrl(process.env.FRONTEND_URL) || 'http://localhost:5173';
+    const notifyUrl = `${backendUrl}/payments/webhook`;
 
-    // For Cashfree production environment, ensure HTTPS
-    if (process.env.NODE_ENV === "PROD" && frontendUrl.startsWith("http://")) {
-      frontendUrl = frontendUrl.replace("http://", "https://");
-    }
+    console.log("🔗 Cashfree URLs:", { returnUrl, notifyUrl });
 
-    // Build return URL with query parameters
-    let returnUrl = `${frontendUrl}/user/dashboard?payment_status={order_status}&order_id={order_id}&member_id=${memberId}`;
-    
-    // Handle notify URL (webhook) - use HTTPS for production, HTTP for local development
-    let backendUrl = process.env.BACKEND_URL || 'http://localhost:5051';
-    // Remove any comments from the URL
-    backendUrl = backendUrl.split(' ')[0].split('//')[0] + '//' + backendUrl.split(' ')[0].split('//')[1];
-    
-    let notifyUrl = `${backendUrl}/payments/webhook`;
-    
-    // For Cashfree production environment, ensure HTTPS
-    if (process.env.NODE_ENV === "PROD" && backendUrl.startsWith("http://")) {
-      backendUrl = backendUrl.replace("http://", "https://");
-      // Also update notifyUrl since backendUrl changed
-      notifyUrl = `${backendUrl}/payments/webhook`;
-    }
-    
-    // Log the URLs for debugging
-    console.log("🔗 URLs for Cashfree:", {
-      frontendUrl: frontendUrl,
-      backendUrl: backendUrl,
-      returnUrl: returnUrl,
-      notifyUrl: notifyUrl
-    });
-
+    // -------- CASHFREE ORDER PAYLOAD ----------
     const cashfreeBody = {
       order_amount: amount,
       order_currency: currency,
+
       customer_details: {
         customer_id: memberId,
-        customer_name: customer?.customer_name || member.Name || "Customer",
-        customer_email: customer?.customer_email || member.email || "customer@example.com",
-        customer_phone: customer?.customer_phone || member.mobileno || "9999999999",
+        customer_email: customer?.customer_email || member.email || "support@example.com",
+        customer_phone: customer?.customer_phone || member.mobileno,
+        customer_name: customer?.customer_name || member.Name
       },
+
       order_meta: {
         return_url: returnUrl,
         notify_url: notifyUrl
       }
     };
 
-    console.log("🚀 Sending to Cashfree:", {
-      url: `${CASHFREE_BASE}/pg/orders`,
-      amount: amount,
-      customer_id: memberId,
-      return_url: returnUrl,
-      notify_url: notifyUrl
-    });
+    console.log("📤 Final Cashfree Payload:", cashfreeBody);
 
-    // Call Cashfree API directly with correct endpoint
-    const response = await axios.post(`${CASHFREE_BASE}/pg/orders`, cashfreeBody, { 
-      headers,
-      timeout: 10000
-    });
+    // -------- SEND TO CASHFREE ----------
+    const headers = {
+      "Content-Type": "application/json",
+      "x-api-version": "2022-09-01",
+      "x-client-id": CASHFREE_APP_ID,
+      "x-client-secret": CASHFREE_SECRET_KEY,
+    };
 
-    console.log("✅ Cashfree response received:", {
-      order_id: response.data.order_id,
-      payment_session_id: response.data.payment_session_id,
-      status: response.status
-    });
+    const response = await axios.post(
+      `${CASHFREE_BASE}/pg/orders`,
+      cashfreeBody,
+      { headers }
+    );
 
-    // Validate that we received a payment_session_id
     if (!response.data.payment_session_id) {
-      console.error("❌ Missing payment_session_id in Cashfree response");
       return res.status(500).json({
         success: false,
-        message: "Payment session could not be created. Please try again.",
-        error: "Missing payment_session_id in response"
+        message: "Cashfree did not return payment_session_id"
       });
     }
 
-    // Save payment record to database
-    const paymentRecord = new PaymentModel({
-      memberId: memberId,
+    console.log("✅ Cashfree order created:", response.data.order_id);
+
+    // -------- SAVE PAYMENT RECORD ----------
+    await PaymentModel.create({
+      memberId,
       orderId: response.data.order_id,
-      cfOrderId: response.data.cf_order_id,
       paymentSessionId: response.data.payment_session_id,
-      amount: amount,
-      currency: currency,
+      amount,
+      currency,
       status: response.data.order_status,
-      customer: {
-        customer_id: memberId,
-        customer_name: customer?.customer_name || member.Name,
-        customer_email: customer?.customer_email || member.email,
-        customer_phone: customer?.customer_phone || member.mobileno,
-      },
-      rawResponse: response.data,
-      notes: notes
+      rawResponse: response.data
     });
 
-    await paymentRecord.save();
-    console.log("✅ Payment record saved successfully");
-
-    // Save repayment transaction to database
-    const transactionData = {
+    // -------- SAVE TRANSACTION (Loan repayment) ----------
+    await TransactionModel.create({
       transaction_id: response.data.order_id,
-      transaction_date: new Date().toISOString(),
+      transaction_date: new Date(),
       member_id: memberId,
-      description: `Loan Repayment Payment of ₹${amount}. Amount will be deducted after payment success.`,
-      Name: member.Name,
-      mobileno: member.mobileno,
-      transaction_type: "Loan Repayment Payment",
-      ew_debit: amount,
-      // Don't set net_amount yet as it will be calculated after webhook success
+      description: `Loan repayment of ₹${amount}`,
       status: "Pending",
-      reference_no: response.data.order_id,
-      is_loan_repayment: true,
+      is_loan_repayment: isLoanRepayment,
+      ew_debit: amount,
       repayment_context: {
         member_id: memberId,
         requested_amount: amount,
         current_due_amount: currentDueAmount,
-        // Don't set new_due_amount yet as it will be calculated after webhook success
-        member_name: member.Name,
-        member_phone: member.mobileno,
-        original_loan_id: loanTransaction?._id,
-        original_loan_reference: loanTransaction?.reference_no,
-        original_loan_transaction_id: loanTransaction?.transaction_id
-      },
-    
+        original_loan_id: loanTransaction?._id
+      }
+    });
 
-    };
-
-    await TransactionModel.create(transactionData);
-    console.log("✅ Payment transaction saved successfully");
-
-    const responseData = {
+    // -------- SEND TO FRONTEND ----------
+    res.json({
       success: true,
       order_id: response.data.order_id,
       payment_session_id: response.data.payment_session_id,
-      order_amount: response.data.order_amount,
-      order_currency: response.data.order_currency,
-      is_loan_repayment: true,
-      member_id: memberId,
-      member_name: member.Name,
-      // Tell frontend which Cashfree environment to use (must match backend)
-      cashfree_env: process.env.NODE_ENV === "PROD" ? "production" : "sandbox",
-      loan_details: {
-        current_due_amount: currentDueAmount,
-        repayment_amount: amount,
-        // Don't send new_due_amount as it will be calculated after webhook success
-        repayment_status: "Pending",
-        original_loan_updated: false,
-        original_loan_id: loanTransaction?._id
-      }
-    };
-
-    console.log("📤 Sending success response to client");
-    res.json(responseData);
+      cashfree_env: process.env.NODE_ENV === "PROD" ? "production" : "sandbox"
+    });
 
   } catch (error) {
-    console.error("❌ ERROR IN CREATE ORDER =====================");
-    console.error("Error name:", error.name);
-    console.error("Error message:", error.message);
-
-    if (error.response) {
-      console.error("🚨 Cashfree API Error:");
-      console.error("Status:", error.response.status);
-      console.error("Data:", JSON.stringify(error.response.data, null, 2));
-
-      if (error.response.status === 401) {
-        // Check if it's a credential mismatch issue
-        const isTestCredentials = process.env.CASHFREE_APP_ID?.startsWith('TEST') || 
-                                 process.env.CASHFREE_SECRET_KEY?.includes('test');
-        const isProductionEnv = process.env.NODE_ENV === "PROD";
-        
-        if (isProductionEnv && isTestCredentials) {
-          return res.status(500).json({
-            success: false,
-            message: "Payment service authentication failed.",
-            error: "Invalid Cashfree credentials",
-            details: error.response.data,
-            solution: "You're using TEST credentials in PRODUCTION environment. Either switch to production credentials or set NODE_ENV=development"
-          });
-        }
-        
-        return res.status(500).json({
-          success: false,
-          message: "Payment service authentication failed.",
-          error: "Invalid Cashfree credentials",
-          details: error.response.data,
-          solution: "Verify your CASHFREE_APP_ID and CASHFREE_SECRET_KEY are correct for production environment"
-        });
-      }
-
-      if (error.response.status === 400) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid payment request.",
-          error: error.response.data?.message || "Bad request to payment service"
-        });
-      }
-
-      // Handle payment_session_id_invalid error specifically
-      if (error.response.data?.code === "payment_session_id_invalid") {
-        return res.status(400).json({
-          success: false,
-          message: "Payment session is invalid or has expired. Please try again.",
-          error: error.response.data
-        });
-      }
-
-      // Handle return_url_invalid error specifically
-      if (error.response.data?.code === "order_meta.return_url_invalid") {
-        return res.status(400).json({
-          success: false,
-          message: "Return URL is invalid. For production environments, HTTPS URLs are required.",
-          error: error.response.data,
-          solution: "Ensure your FRONTEND_URL environment variable uses HTTPS in production"
-        });
-      }
-
-      // Handle notify_url_invalid error specifically
-      if (error.response.data?.code === "order_meta.notify_url_invalid") {
-        return res.status(400).json({
-          success: false,
-          message: "Notify URL (webhook) is invalid. For production environments, HTTPS URLs are required.",
-          error: error.response.data,
-          solution: "Ensure your BACKEND_URL environment variable uses HTTPS in production"
-        });
-      }
-    }
-
+    console.error("❌ ERROR:", error.response?.data || error.message);
     res.status(500).json({
       success: false,
-      message: "Failed to create payment order",
-      error: error.response?.data?.message || error.message,
+      message: "Failed to create order",
+      error: error.response?.data || error.message
     });
   } finally {
-    console.log("🔚 CREATE ORDER COMPLETED =====================\n");
+    console.log("🔚 CREATE ORDER END =====================");
   }
 };
+
 
 // Verify payment status
 exports.verifyPayment = async (req, res) => {

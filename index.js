@@ -22,7 +22,8 @@ const app = express();
 // ======================================================
 const allowedOrigins = [
   process.env.FRONTEND_URL,
-  "https://mscs-beige.vercel.app"
+  "https://mscs-beige.vercel.app",
+  "https://biccsl.vercel.app"
 ].filter(Boolean);
 
 app.use(

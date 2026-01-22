@@ -7,26 +7,33 @@ const TransactionModel = require("../../../models/Transaction/Transaction");
  * 
  * Structure:
  * - Level 1 (Direct Referral): ₹100 - When a member directly refers someone
- * - Levels 2-10 (Indirect Referrals): ₹25 each - When someone in your downline refers someone
+ * - Levels 2-5 (Indirect Referrals): ₹25 each
+ * - Levels 6-10 (Indirect Referrals): ₹15 each
+ * - Levels 11-15 (Indirect Referrals): ₹5 each
  * 
  * Example:
  * - A refers B → A gets ₹100 (Level 1)
  * - B refers C → B gets ₹100 (Level 1), A gets ₹25 (Level 2)
  * - C refers D → C gets ₹100 (Level 1), B gets ₹25 (Level 2), A gets ₹25 (Level 3)
  * 
- * Total potential commission per referral: ₹325 (₹100 + ₹25 × 9)
+ * Total potential commission per referral: ₹300 (₹100 + ₹25×4 + ₹15×5 + ₹5×5)
  */
 const commissionRates = {
-  1: 100,  // Direct referral commission
+  1: 25,  // Direct referral commission
   2: 25,   // 2nd level indirect commission
   3: 25,   // 3rd level indirect commission
   4: 25,   // 4th level indirect commission
   5: 25,   // 5th level indirect commission
-  6: 25,   // 6th level indirect commission
-  7: 25,   // 7th level indirect commission
-  8: 25,   // 8th level indirect commission
-  9: 25,   // 9th level indirect commission
-  10: 25   // 10th level indirect commission
+  6: 15,   // 6th level indirect commission
+  7: 15,   // 7th level indirect commission
+  8: 15,   // 8th level indirect commission
+  9: 15,   // 9th level indirect commission
+  10: 15,  // 10th level indirect commission
+  11: 5,   // 11th level indirect commission
+  12: 5,   // 12th level indirect commission
+  13: 5,   // 13th level indirect commission
+  14: 5,   // 14th level indirect commission
+  15: 5    // 15th level indirect commission
 };
 
 const getOrdinal = (number) => {
@@ -45,7 +52,7 @@ const getOrdinal = (number) => {
  *   - Level 1: B (C's direct sponsor) - gets ₹100
  *   - Level 2: A (B's sponsor) - gets ₹25
  */
-const findUplineSponsors = async (memberId, maxLevels = 10) => {
+const findUplineSponsors = async (memberId, maxLevels = 15) => {
   const uplineSponsors = [];
   let currentMemberId = memberId;
   let level = 0;
@@ -79,7 +86,7 @@ const findUplineSponsors = async (memberId, maxLevels = 10) => {
   }
 
   // console.log(`📊 Found ${uplineSponsors.length} upline sponsors for member ${memberId}`);
-  // return uplineSponsors;
+  return uplineSponsors;
 };
 
 /**
@@ -87,7 +94,9 @@ const findUplineSponsors = async (memberId, maxLevels = 10) => {
  * 
  * Commission Structure:
  * - Level 1 (Direct Sponsor): ₹100
- * - Levels 2-10 (Indirect Sponsors): ₹25 each
+ * - Levels 2-5 (Indirect Sponsors): ₹25 each
+ * - Levels 6-10 (Indirect Sponsors): ₹15 each
+ * - Levels 11-15 (Indirect Sponsors): ₹5 each
  * 
  * Example Flow:
  * - A refers B → When B activates: A gets ₹100 (Level 1)
@@ -100,8 +109,8 @@ const findUplineSponsors = async (memberId, maxLevels = 10) => {
  */
 const calculateCommissions = async (newMemberId, directSponsorId) => {
   try {
-    // Find all upline sponsors up to 10 levels
-    const uplineSponsors = await findUplineSponsors(newMemberId, 10);
+    // Find all upline sponsors up to 15 levels
+    const uplineSponsors = await findUplineSponsors(newMemberId, 15);
 
     if (uplineSponsors.length === 0) {
       // console.log(`⚠️ No upline sponsors found for member ${newMemberId}`);
@@ -311,7 +320,7 @@ const updateSponsorReferrals = async (sponsorId, newMemberId) => {
   }
 };
 
-const getUplineTree = async (memberId, maxLevels = 10) => {
+const getUplineTree = async (memberId, maxLevels = 15) => {
   try {
     const tree = [];
     let currentMemberId = memberId;
@@ -354,10 +363,12 @@ const getUplineTree = async (memberId, maxLevels = 10) => {
 
 const getCommissionSummary = () => {
   return {
-    total_levels: 10,
+    total_levels: 15,
     level_1_commission: 100,
-    levels_2_to_10_commission: 25,
-    total_potential: 325,
+    levels_2_to_5_commission: 25,
+    levels_6_to_10_commission: 15,
+    levels_11_to_15_commission: 5,
+    total_potential: 300,
     rates: commissionRates,
     condition: "Commissions only for sponsors with 'active' status"
   };

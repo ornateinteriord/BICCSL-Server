@@ -6,6 +6,7 @@ const {
 } = require("../../utils/EmailService");
 const { generateOTP, storeOTP, verifyOTP } = require("../../utils/OtpService");
 const { generateMSCSEmail } = require("../../utils/generateMSCSEmail");
+const { updateSponsorReferrals } = require("../../controllers/Users/mlmService/mlmService");
 
 const recoverySubject = "MSI - Password Recovery";
 const resetPasswordSubject =  "MSI - OTP Verification";
@@ -21,13 +22,22 @@ const generateUniqueMemberId = async () => {
 
 const signup = async (req, res) => {
   try {
-    const { email, password, Name, ...otherDetails } = req.body;
+    const { email, password, Name, sponsorId, ...otherDetails } = req.body;
     // const existingUser = await MemberModel.findOne({ email });
     // if (existingUser) {
     //   return res.status(400).json({ success: false, message: "Email already in use" });
     // }
 
     const memberId = await generateUniqueMemberId();
+    
+    // Find the sponsor if provided
+    let sponsor = null;
+    if (sponsorId) {
+      sponsor = await MemberModel.findOne({ Member_id: sponsorId });
+      if (!sponsor) {
+        return res.status(400).json({ success: false, message: "Invalid sponsor ID" });
+      }
+    }
 
     const newMember = new MemberModel({
       Member_id: memberId,
@@ -35,9 +45,24 @@ const signup = async (req, res) => {
       password,
       Name,
       
+      // Assign sponsor if provided
+      sponsor_id: sponsorId || null,
+      Sponsor_code: sponsorId || null,
+      Sponsor_name: sponsor ? sponsor.Name : null,
+      
       ...otherDetails,
     });
     await newMember.save();
+
+    // If a sponsor was provided, add this member to the sponsor's direct referrals
+    if (sponsorId) {
+      try {
+        await updateSponsorReferrals(sponsorId, memberId);
+        console.log(`✅ Added new member ${memberId} to sponsor ${sponsorId}'s direct referrals`);
+      } catch (referralError) {
+        console.error("Error updating sponsor referrals:", referralError);
+      }
+    }
 
     try {
 
@@ -96,7 +121,14 @@ const recoverPassword = async (req, res) => {
       .status(404)
       .json({ success: false, message: "Email not registered" });
     }
-    const recoveryDescription = `Dear Member,\n\nYou requested a password recovery. Here is your password:\n ${user.password}\n\nPlease keep this information secure.\n\nBest regards,\MSI Team`;
+    const recoveryDescription = `Dear Member,
+
+You requested a password recovery. Here is your password:
+ ${user.password}
+
+Please keep this information secure.
+
+Best regards,\MSI Team`;
 
     await sendMail(user.email, recoverySubject, recoveryDescription);
     res.json({ success: true, message: "Password sent to your email" });
@@ -134,7 +166,16 @@ const resetPassword = async (req, res) => {
       });
     }
     const newOtp = generateOTP();
-    const resetPasswordDescription = `Dear Member,\n\nYour OTP for password reset is: ${newOtp}\n\nPlease use this OTP to proceed with resetting your password.\n\nPlease keep don't share with anyone.\n\nBest regards,\nMSI Team`;
+    const resetPasswordDescription = `Dear Member,
+
+Your OTP for password reset is: ${newOtp}
+
+Please use this OTP to proceed with resetting your password.
+
+Please keep don't share with anyone.
+
+Best regards,
+MSI Team`;
     storeOTP(email, newOtp);
     await sendMail(email, resetPasswordSubject , resetPasswordDescription);
     return res.json({ success: true, message: "OTP sent to your email" });

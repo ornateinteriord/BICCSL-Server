@@ -2,10 +2,10 @@ const MemberModel = require("../../../models/Users/Member");
 
 /**
  * Get multi-level sponsorship data for a member
- * Returns data for up to 10 levels of sponsorship
+ * Returns data for up to 15 levels of sponsorship
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
- * @returns {Object} Response with sponsorship data for up to 10 levels
+ * @returns {Object} Response with sponsorship data for up to 15 levels
  */
 const getMultiLevelSponsorship = async (req, res) => {
   try {
@@ -18,7 +18,7 @@ const getMultiLevelSponsorship = async (req, res) => {
 
     // Array to store level-wise data
     const levelData = [];
-    const MAX_LEVELS = 10;
+    const MAX_LEVELS = 15;
 
     // Process each level
     let currentLevelMemberIds = [memberId];

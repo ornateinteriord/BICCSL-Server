@@ -96,7 +96,7 @@ const activateMemberPackage = async (req, res) => {
 
     // Define available packages
     const packages = {
-      standard: { name: "standard", value: 2600 },
+      standard: { name: "standard", value: 1200 },
       RD: { name: "RD", value: 1000 },
     };
 

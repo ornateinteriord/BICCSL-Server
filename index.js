@@ -14,9 +14,42 @@ const KYCRoutes = require("./routes/KYCRoutes");
 
 // 🔐 CASHFREE WEBHOOK CONTROLLER
 const { handleWebhook } = require("./controllers/Payments/CashfreeController");
+const connectDB = require("./models/db");
 
 const app = express();
 
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error('❌ Database Connection Error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Database connection failed. Please try again.'
+    });
+  }
+});
+
+const startServer = async () => {
+  try {
+    await connectDB();
+    console.log("✅ MongoDB connected");
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`🌍 Server running on port ${PORT}`);
+      console.log("🔔 Cashfree webhook ready");
+    });
+  } catch (error) {
+    console.error("❌ Server failed:", error.message);
+    process.exit(1);
+  }
+};
+
+// Start server only if NOT running in Vercel environment
+if (process.env.VERCEL !== "1") {
+  startServer();
+}
 // ======================================================
 //        🛡️ CORS CONFIG (Supports Vite + ngrok)
 // ======================================================

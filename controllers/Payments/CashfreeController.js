@@ -5,8 +5,8 @@ const MemberModel = require("../../models/Users/Member");
 const PaymentModel = require("../../models/Payments/Payment");
 
 // Cashfree API Base URLs
-const CASHFREE_BASE = process.env.NODE_ENV === "PROD" 
-  ? "https://api.cashfree.com" 
+const CASHFREE_BASE = process.env.NODE_ENV === "PROD"
+  ? "https://api.cashfree.com"
   : "https://sandbox.cashfree.com";
 const X_API_VERSION = "2022-09-01";
 
@@ -54,7 +54,7 @@ async function processLoanRepayment(paymentTransaction, _data) {
     // This can happen if webhooks are sent multiple times
     const existingNetAmount = parseFloat(loanTransaction.net_amount);
     const expectedNewAmount = parseFloat(new_due_amount.toFixed(2));
-    
+
     // If the loan already has the expected new amount, it means this repayment was already processed
     if (Math.abs(existingNetAmount - expectedNewAmount) < 0.01) {
       console.log("⚠️ Loan repayment already processed, skipping update");
@@ -79,7 +79,7 @@ async function processLoanRepayment(paymentTransaction, _data) {
     }
 
     await loanTransaction.save();
-    
+
     // Log after update
     console.log("📋 Loan transaction after update:", {
       _id: loanTransaction._id,
@@ -87,7 +87,7 @@ async function processLoanRepayment(paymentTransaction, _data) {
       new_net_amount: loanTransaction.net_amount,
       repayment_status: loanTransaction.repayment_status
     });
-    
+
     console.log("✅ Loan transaction updated successfully");
 
     if (new_due_amount <= 0) {
@@ -199,17 +199,17 @@ exports.createOrder = async (req, res) => {
 
       let baseDueAmount = parseFloat(loanTransaction.net_amount);
 
-      const completedRepayments = await TransactionModel.find({
+      const pendingRepayments = await TransactionModel.find({
         member_id: memberId,
         is_loan_repayment: true,
-        status: "Completed",
+        status: "Pending",
         "repayment_context.original_loan_id": loanTransaction._id
       });
 
-      let completedAmount = completedRepayments.reduce((sum, t) =>
+      let pendingAmount = pendingRepayments.reduce((sum, t) =>
         sum + parseFloat(t.repayment_context.requested_amount || 0), 0);
 
-      currentDueAmount = baseDueAmount - completedAmount;
+      currentDueAmount = baseDueAmount - pendingAmount;
 
       if (currentDueAmount <= 0) {
         return res.status(400).json({
@@ -467,7 +467,7 @@ exports.handleWebhook = async (req, res) => {
     console.log("📦 Webhook Headers:", req.headers);
     console.log("📦 Webhook Body Type:", typeof req.body);
     console.log("📦 Webhook Body Length:", req.body?.length || 'N/A');
-    
+
     // Log first 1000 characters of body for debugging without overwhelming logs
     if (typeof req.body === 'string') {
       console.log("📦 Webhook Body Preview:", req.body.substring(0, 1000) + (req.body.length > 1000 ? '...' : ''));
@@ -538,9 +538,9 @@ exports.handleWebhook = async (req, res) => {
         secretEnd: "..." + secret.substring(secret.length - 10),
         webhookVersion: webhookVersion
       });
-      
+
       let genSig;
-      
+
       // Different signature verification based on webhook version
       if (webhookVersion === "2023-08-01") {
         // Newer version uses timestamp + payload (correct method per Cashfree docs)
@@ -587,7 +587,7 @@ exports.handleWebhook = async (req, res) => {
     console.log("🔍 Extracting order ID from webhook data...");
     const orderId = data.data?.order?.order_id || data.data?.order_id || data.order_id;
     console.log("📋 Extracted order ID:", orderId);
-    
+
     if (!orderId) {
       console.warn("❌ No order ID found in webhook data");
       console.log("📄 Full webhook data structure:", JSON.stringify(data, null, 2));
@@ -605,7 +605,7 @@ exports.handleWebhook = async (req, res) => {
       const similarTransactions = await TransactionModel.find({
         transaction_id: { $regex: orderId.substring(0, Math.min(orderId.length, 10)) }
       }).limit(5);
-      
+
       if (similarTransactions.length > 0) {
         console.log("🔍 Found similar transactions:", similarTransactions.map(t => ({
           id: t.transaction_id,
@@ -615,7 +615,7 @@ exports.handleWebhook = async (req, res) => {
       } else {
         console.log("🔍 No similar transactions found");
       }
-      
+
       // Still return 200 to acknowledge receipt, but log the issue
       return res.status(200).json({
         success: false,
@@ -625,6 +625,7 @@ exports.handleWebhook = async (req, res) => {
     }
 
     // IDEMPOTENCY CHECK - Prevent duplicate processing
+    // Use atomic update to prevent race conditions
     if (paymentTransaction.webhook_processed) {
       console.log("⚠️ Webhook already processed for order:", orderId);
       return res.status(200).json({
@@ -633,6 +634,25 @@ exports.handleWebhook = async (req, res) => {
         order_id: orderId
       });
     }
+
+    // Attempt to acquire lock atomically
+    const lockResult = await TransactionModel.updateOne(
+      { _id: paymentTransaction._id, webhook_processed: false },
+      { $set: { webhook_processed: true, webhook_processed_at: new Date() } }
+    );
+
+    if (lockResult.modifiedCount === 0) {
+      console.log("⚠️ Race condition detected: Webhook already processed by another request for order:", orderId);
+      return res.status(200).json({
+        success: true,
+        message: "Webhook already processed (race accepted)",
+        order_id: orderId
+      });
+    }
+
+    // Identify that we hold the lock, so subsequent saves should respect this
+    paymentTransaction.webhook_processed = true;
+    console.log("🔒 Atomic lock acquired for processing order:", orderId);
 
     console.log("✅ Payment transaction found:", {
       transaction_id: paymentTransaction.transaction_id,
@@ -646,7 +666,7 @@ exports.handleWebhook = async (req, res) => {
     // Cashfree uses payment_status for newer webhooks and order_status for older ones
     const orderStatus = data.data?.payment?.payment_status || data.data?.order?.order_status || data.order_status;
     console.log("📋 Extracted order status:", orderStatus);
-    
+
     if (!orderStatus) {
       console.warn("❌ No order status found in webhook data");
       console.log("📄 Data structure for status extraction:", JSON.stringify(data, null, 2));
@@ -659,11 +679,11 @@ exports.handleWebhook = async (req, res) => {
       "CANCELLED": "CANCELLED",  // Fixed: Use "CANCELLED" instead of "Cancelled"
       "PENDING": "PENDING"  // Fixed: Use "PENDING" instead of "Pending"
     };
-    
+
     const mappedStatus = statusMap[orderStatus] || orderStatus;
     const isSuccessful = mappedStatus === "PAID";
     const status = isSuccessful ? "Completed" : "Failed";  // Transaction status
-    
+
     console.log("📊 Payment outcome evaluation:", {
       rawOrderStatus: orderStatus,
       mappedStatus: mappedStatus,
@@ -772,14 +792,14 @@ exports.handleWebhook = async (req, res) => {
     console.error("Error name:", err.name);
     console.error("Error message:", err.message);
     console.error("Stack trace:", err.stack);
-    
+
     // Try to log the request body if available
     try {
       console.log("📄 Request body at time of error:", typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
     } catch (logErr) {
       console.log("📄 Could not log request body:", logErr.message);
     }
-    
+
     // Always return 200 to acknowledge receipt, even if processing failed
     // This prevents Cashfree from retrying indefinitely
     res.status(200).json({
@@ -848,7 +868,7 @@ exports.retryPayment = async (req, res) => {
 
     // Call Cashfree API directly with correct endpoint
     const response = await axios.post(`${CASHFREE_BASE}/pg/orders/${orderId}/retry`, retryBody, { headers });
-    
+
     // Update payment record
     payment.paymentSessionId = response.data.payment_session_id;
     payment.status = response.data.order_status;

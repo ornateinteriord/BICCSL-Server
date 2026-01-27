@@ -12,6 +12,11 @@ const {
 
 const triggerMLMCommissions = async (req, res) => {
   try {
+    return res.status(200).json({
+      success: true,
+      message: "MLM Commissions are currently disabled"
+    });
+    /*
     const { new_member_id, Sponsor_code } = req.body;
 
     console.log("🟢 Incoming Request Data:", { new_member_id, Sponsor_code });
@@ -124,6 +129,7 @@ const triggerMLMCommissions = async (req, res) => {
         },
       },
     });
+    */
   } catch (error) {
     console.error("❌ Error triggering MLM commissions:", error);
     return res.status(500).json({
@@ -326,6 +332,14 @@ const getDailyPayout = async (req, res) => {
   }
 };
 
+const LOAN_TIERS = [
+  { level: 1, amount: 5000, deduction: 250, credit: 4750, installmen_weeks: 10, weekly_payment: 500 },
+  { level: 2, amount: 10000, deduction: 600, credit: 9400, installmen_weeks: 10, weekly_payment: 1000 },
+  { level: 3, amount: 25000, deduction: 2500, credit: 22500, installmen_weeks: 25, weekly_payment: 1000 },
+  { level: 4, amount: 50000, deduction: 5000, credit: 45000, installmen_weeks: 50, weekly_payment: 1000 },
+  { level: 5, amount: 100000, deduction: 15000, credit: 85000, installmen_weeks: 50, weekly_payment: 2000 },
+];
+
 const climeRewardLoan = async (req, res) => {
   try {
     const { memberId } = req.params;
@@ -347,14 +361,45 @@ const climeRewardLoan = async (req, res) => {
         .json({ success: false, message: "Member not found" });
     }
 
-    // Prevent duplicate pending/processing claims
-    if (member.upgrade_status === "Processing") {
+    // Check for any active loan (Pending, Processing, Approved but not fully Paid)
+    const activeLoan = await TransactionModel.findOne({
+      member_id: memberId,
+      transaction_type: "Reward Loan Request",
+      $or: [
+        { status: "Processing" },
+        { status: "Pending" },
+        { status: "Approved", repayment_status: { $ne: "Paid" } }
+      ]
+    });
+
+    if (activeLoan) {
       return res.status(400).json({
         success: false,
-        message: `Loan claim already in status: ${member.upgrade_status}. Please wait for admin review.`,
+        message: "You already have an active or pending loan. Please clear it first.",
       });
     }
-    const loanAmount = 5000;
+
+    // Determine Loan Level
+    const completedLoansCount = await TransactionModel.countDocuments({
+      member_id: memberId,
+      transaction_type: "Reward Loan Request",
+      status: "Approved",
+      repayment_status: "Paid"
+    });
+
+    const currentLevelIndex = completedLoansCount;
+
+    if (currentLevelIndex >= LOAN_TIERS.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Maximum loan limit reached. You have completed all loan levels.",
+      });
+    }
+
+    const loanDetails = LOAN_TIERS[currentLevelIndex];
+    const loanAmount = loanDetails.amount;
+    console.log("loanDetails", loanDetails);
+    console.log("loanDetails", loanAmount);
 
     member.upgrade_status = "Processing";
     await member.save();
@@ -365,18 +410,15 @@ const climeRewardLoan = async (req, res) => {
       member_id: member.Member_id,
       Name: member.Name,
       mobileno: member.mobileno,
-      description: `Reward loan request of ₹${loanAmount}${
-        note ? ` - ${note}` : ""
-      }`,
+      description: `Reward loan request (Level ${loanDetails.level}) of ₹${loanAmount}${note ? ` - ${note}` : ""
+        }`,
       transaction_type: "Reward Loan Request",
       ew_credit: loanAmount,
       ew_debit: "0",
       status: "Processing",
-      // net_amount: loanAmount,
       benefit_type: "loan",
       previous_balance: "",
       reference_no: `RLREF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      amount: loanAmount,
     });
 
     await tx.save();
@@ -384,11 +426,12 @@ const climeRewardLoan = async (req, res) => {
     return res.status(200).json({
       success: true,
       message:
-        "Reward loan claimed successfully. Status set to Pending. Admin will process the request.",
+        `Reward loan (Level ${loanDetails.level}) claimed successfully. Status set to Processing. Admin will process the request.`,
       data: {
         member_id: member.Member_id,
         status: member.upgrade_status,
         requested_amount: loanAmount,
+        level: loanDetails.level,
         transaction_ref: tx.reference_no,
       },
     });
@@ -443,37 +486,69 @@ const processRewardLoan = async (req, res) => {
       status: "Processing",
     }).sort({ transaction_date: -1 });
 
-    // ... (Error handling for transaction/member not found remains the same) ...
+    if (!transaction) {
+      return res.status(404).json({ success: false, message: "Transaction not found" });
+    }
 
     const member = await MemberModel.findOne({ Member_id: memberId });
     // ... (Error handling for member not found remains the same) ...
-
-    const now = new Date().toISOString();
-    const loanAmount = parseFloat(transaction.amount) || 5000;
-
-    if (action === "approve") {
-      transaction.status = "Approved";
-
-      // ✅ CRITICAL UPDATE: Use net_amount to track the DUE BALANCE
-      // Set the net_amount to the full loan amount upon approval.
-      transaction.net_amount = loanAmount.toString();
-  
-      transaction.repayment_status = "Unpaid";
-
-      member.upgrade_status = "Approved";
-      transaction.admin_notes = "Loan approved by admin";
-    } else {
-      transaction.status = "Rejected";
-      member.upgrade_status = "Rejected";
-
-      transaction.admin_notes = "Loan rejected by admin";
+    if (!member) {
+      return res.status(404).json({ success: false, message: "Member not found" });
     }
 
-    transaction.approved_by = "admin";
-    transaction.approved_at = now;
+    const now = new Date().toISOString();
 
-    // Only update member status and transaction
-    await Promise.all([member.save(), transaction.save()]);
+    // STRICT VALIDATION: Determine Correct Loan Level based on history
+    // Do not trust the 'ew_credit' in the request as it might be wrong or manipulated
+    const completedLoansCount = await TransactionModel.countDocuments({
+      member_id: memberId,
+      transaction_type: "Reward Loan Request",
+      status: "Approved",
+      repayment_status: "Paid"
+    });
+
+    // Ensure we don't exceed max level
+    const currentLevelIndex = Math.min(completedLoansCount, LOAN_TIERS.length - 1);
+    const loanDetails = LOAN_TIERS[currentLevelIndex];
+
+    console.log(`🔒 Enforcing Strict Level: ${loanDetails.level} (History Count: ${completedLoansCount})`);
+    console.log("Details:", loanDetails);
+
+    const finalLoanAmount = loanDetails.amount;
+    const finalCreditAmount = loanDetails.credit;
+    const deduction = loanDetails.deduction;
+
+    const updateData = {
+      approved_by: "admin",
+      approved_at: now
+    };
+
+    if (action === "approve") {
+      updateData.status = "Approved";
+
+      // FORCE String conversion and log it
+      const dueAmountStr = finalLoanAmount.toString();
+      console.log(`💰 Setting net_amount (Due) to: ${dueAmountStr} (Type: ${typeof dueAmountStr})`);
+
+      updateData.net_amount = dueAmountStr;
+      updateData.ew_credit = finalCreditAmount.toString(); // Ensure string for consistency
+      updateData.repayment_status = "Unpaid";
+      updateData.admin_notes = `Loan approved. Tier Level: ${loanDetails?.level || 'Custom'}. Deduction: ${deduction}. Credited: ${finalCreditAmount}. Due: ${finalLoanAmount}.`;
+
+      member.upgrade_status = "Approved";
+    } else {
+      updateData.status = "Rejected";
+      updateData.admin_notes = "Loan rejected by admin";
+
+      member.upgrade_status = "Rejected";
+    }
+
+    // Force update via MongoDB directly to avoid schema/instance issues
+    await TransactionModel.findByIdAndUpdate(transaction._id, { $set: updateData });
+    await member.save();
+
+    // Update local object for response
+    Object.assign(transaction, updateData);
 
     return res.status(200).json({
       success: true,
@@ -482,10 +557,13 @@ const processRewardLoan = async (req, res) => {
         member_id: member.Member_id,
         member_name: member.Name,
         status: transaction.status,
-        amount: transaction.amount,
+        amount: transaction.ew_credit,
         transaction_ref: transaction.reference_no,
         ...(action === "approve" && {
-          initial_due_amount: transaction.net_amount,
+          level: loanDetails?.level,
+          credited_amount: finalCreditAmount,
+          due_amount: finalLoanAmount,
+          deduction: deduction
         }),
       },
     });
@@ -503,7 +581,7 @@ const repaymentLoan = async (req, res) => {
   try {
     const { memberId } = req.params;
     const { amount } = req.body;
-    
+
     if (!memberId) {
       return res.status(400).json({
         success: false,
@@ -546,7 +624,7 @@ const repaymentLoan = async (req, res) => {
 
     // Get the base due amount from the loan transaction
     let baseDueAmount = parseFloat(loanTransaction.net_amount) || parseFloat(loanTransaction.ew_credit) || 0;
-    
+
     // Find any pending repayment transactions for this loan to adjust the current due amount
     // Note: For manual repayments, we're less likely to have pending transactions, but we'll check for consistency
     const pendingRepayments = await TransactionModel.find({
@@ -555,23 +633,23 @@ const repaymentLoan = async (req, res) => {
       status: "Pending",
       "repayment_context.original_loan_id": loanTransaction._id
     });
-    
+
     // Calculate total pending repayment amount
     let pendingRepaymentAmount = 0;
     pendingRepayments.forEach(repayment => {
       pendingRepaymentAmount += parseFloat(repayment.repayment_context.requested_amount) || 0;
     });
-    
+
     // Adjust current due amount by subtracting pending repayments
     currentDueAmount = baseDueAmount - pendingRepaymentAmount;
-    
+
     console.log("💳 Current due amount calculation:", {
       base_due_amount: baseDueAmount,
       pending_repayments_count: pendingRepayments.length,
       pending_repayment_amount: pendingRepaymentAmount,
       adjusted_current_due: currentDueAmount
     });
-    
+
     if (currentDueAmount <= 0) {
       return res.status(400).json({
         success: false,
@@ -582,7 +660,7 @@ const repaymentLoan = async (req, res) => {
     // Calculate actual payment and new due amount
     const actualPayment = Math.min(amount, currentDueAmount);
     const newDueAmount = currentDueAmount - actualPayment;
-    
+
     console.log("📊 Amount calculation:", {
       current_due: currentDueAmount,
       repayment_amount: actualPayment,
@@ -618,7 +696,7 @@ const repaymentLoan = async (req, res) => {
       new_net_amount: newDueAmount.toFixed(2),
       previous_repayment_status: loanTransaction.repayment_status
     });
-    
+
     loanTransaction.net_amount = newDueAmount.toFixed(2);
     loanTransaction.repayment_status = newDueAmount <= 0 ? "Paid" : "Partially Paid";
 

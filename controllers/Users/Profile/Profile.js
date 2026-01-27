@@ -6,36 +6,36 @@ const { triggerMLMCommissions } = require("../Payout/PayoutController");
 const getMemberDetails = async (req, res) => {
   try {
     const id = req.user.id;
-    
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid User ID" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid User ID"
       });
     }
 
     const foundUser = await MemberModel.findById(id) || await AdminModel.findById(id);
-                  
+
     if (!foundUser) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found" 
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
       });
     }
 
     // If admin, return all members
     if (foundUser instanceof AdminModel) {
       const members = await MemberModel.find();
-      return res.status(200).json({ 
-        success: true, 
-        data: foundUser, 
-        members 
+      return res.status(200).json({
+        success: true,
+        data: foundUser,
+        members
       });
     }
 
     // For regular members - get actual registration counts from database
-    const directCount = await MemberModel.countDocuments({ 
-      referred_by: foundUser.Member_id 
+    const directCount = await MemberModel.countDocuments({
+      referred_by: foundUser.Member_id
     });
 
     const totalTeamCount = await MemberModel.countDocuments({
@@ -57,16 +57,16 @@ const getMemberDetails = async (req, res) => {
       }
     };
 
-    return res.status(200).json({ 
-      success: true, 
-      data: responseData 
+    return res.status(200).json({
+      success: true,
+      data: responseData
     });
 
   } catch (error) {
     console.error("Error fetching User details:", error);
-    return res.status(500).json({ 
-      success: false, 
-      message: "Server error" 
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
     });
   }
 };
@@ -74,7 +74,7 @@ const getMemberDetails = async (req, res) => {
 const activateMemberPackage = async (req, res) => {
   try {
     const { memberId } = req.params;
-    const { packageType } = req.body; 
+    const { packageType } = req.body;
 
     let query;
     if (mongoose.Types.ObjectId.isValid(memberId)) {
@@ -86,9 +86,9 @@ const activateMemberPackage = async (req, res) => {
     // Fetch existing member
     const existingMember = await MemberModel.findOne(query);
     if (!existingMember) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Member not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Member not found"
       });
     }
 
@@ -96,12 +96,19 @@ const activateMemberPackage = async (req, res) => {
 
     // Define available packages
     const packages = {
-      standard: { name: "standard", value: 1200 },
-      RD: { name: "RD", value: 1000 },
+      RD_1200: { name: "RD", value: 1200 },
+      RD_600: { name: "RD", value: 600 },
     };
 
     // Validate selected package
-    const selectedPackage = packages[packageType] || packages.standard;
+    const selectedPackage = packages[packageType];
+
+    if (!selectedPackage) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid package type selected. Valid options are RD_1200, RD_600."
+      });
+    }
 
     // Update member
     const updatedMember = await MemberModel.findOneAndUpdate(
@@ -115,14 +122,15 @@ const activateMemberPackage = async (req, res) => {
     );
 
     if (!updatedMember) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Member not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Member not found"
       });
     }
 
     // MLM activation only when status changes to active
     if (oldStatus !== "active" && updatedMember.status === "active") {
+      /* 
       try {
         // Trigger MLM commissions
         const mlmResult = await triggerMLMCommissions({
@@ -150,6 +158,13 @@ const activateMemberPackage = async (req, res) => {
           mlm_error: mlmError.message
         });
       }
+      */
+      // Temporary response without MLM
+      return res.status(200).json({
+        success: true,
+        data: updatedMember,
+        message: `${selectedPackage.name} package activated successfully (Commissions Disabled)`
+      });
     }
 
     return res.status(200).json({
@@ -169,19 +184,19 @@ const activateMemberPackage = async (req, res) => {
 };
 
 
-const getMember = async(req,res)=>{
+const getMember = async (req, res) => {
   try {
-    if(req.user.role !== "ADMIN"){
+    if (req.user.role !== "ADMIN") {
       return res
-      .status(403)
-      .json({ success: false, message: "Access Denied", });
+        .status(403)
+        .json({ success: false, message: "Access Denied", });
     }
     const memberId = req.params.memberId
-    const member = await MemberModel.findOne({Member_id:memberId})
-    if(!member){
+    const member = await MemberModel.findOne({ Member_id: memberId })
+    if (!member) {
       return res
-      .status(404)
-      .json({ success: false, message: "Member not found", });
+        .status(404)
+        .json({ success: false, message: "Member not found", });
     }
     return res.status(200).json({ success: true, member });
   } catch (error) {
@@ -194,9 +209,9 @@ const UpdateMemberDetails = async (req, res) => {
     let memberId;
 
     if (req.user.role === "ADMIN") {
-      memberId = req.params.memberId; 
+      memberId = req.params.memberId;
     } else {
-      memberId = req.user.memberId; 
+      memberId = req.user.memberId;
     }
 
     if (!memberId) {
@@ -238,7 +253,7 @@ const UpdateMemberDetails = async (req, res) => {
           message: "Password must be at least 6 characters long",
         });
       }
-     
+
       updateData.password = newPassword;
     }
 
@@ -295,6 +310,7 @@ const updateMemberStatus = async (req, res) => {
 
     // If status changed to active (from any status) trigger MLM commissions
     if (oldStatus !== "active" && status === "active") {
+      /*
       try {
         // Trigger MLM commissions
         const mlmResult = await triggerMLMCommissions({
@@ -322,6 +338,13 @@ const updateMemberStatus = async (req, res) => {
           mlm_error: mlmError.message
         });
       }
+      */
+      // Temporary response without MLM
+      return res.status(200).json({
+        success: true,
+        message: "Member status updated to active (Commissions Disabled)",
+        data: updatedMember
+      });
     }
 
     return res.status(200).json({ success: true, message: "Member status updated", data: updatedMember });
@@ -331,4 +354,4 @@ const updateMemberStatus = async (req, res) => {
   }
 };
 
-module.exports = { getMemberDetails, UpdateMemberDetails,getMember ,activateMemberPackage, updateMemberStatus};
+module.exports = { getMemberDetails, UpdateMemberDetails, getMember, activateMemberPackage, updateMemberStatus };

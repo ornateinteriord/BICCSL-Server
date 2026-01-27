@@ -19,6 +19,7 @@ const TransactionModel = require("../../../models/Transaction/Transaction");
  * Total potential commission per referral: ₹300 (₹100 + ₹25×4 + ₹15×5 + ₹5×5)
  */
 const commissionRates = {
+  /*
   1: 25,  // Direct referral commission
   2: 25,   // 2nd level indirect commission
   3: 25,   // 3rd level indirect commission
@@ -34,6 +35,7 @@ const commissionRates = {
   13: 5,   // 13th level indirect commission
   14: 5,   // 14th level indirect commission
   15: 5    // 15th level indirect commission
+  */
 };
 
 const getOrdinal = (number) => {
@@ -108,6 +110,8 @@ const findUplineSponsors = async (memberId, maxLevels = 15) => {
  * @returns {Array} Array of commission objects for eligible sponsors
  */
 const calculateCommissions = async (newMemberId, directSponsorId) => {
+  return []; // COMMISSIONS DISABLED
+  /*
   try {
     // Find all upline sponsors up to 15 levels
     const uplineSponsors = await findUplineSponsors(newMemberId, 15);
@@ -157,6 +161,7 @@ const calculateCommissions = async (newMemberId, directSponsorId) => {
     console.error("❌ Error calculating commissions:", error);
     throw error;
   }
+  */
 };
 
 /**

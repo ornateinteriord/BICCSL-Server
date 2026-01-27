@@ -15,8 +15,8 @@ const MemberSchema = new mongoose.Schema(
     gender: { type: String },
     dob: { type: String },
     password: { type: String, required: true },
-    Sponsor_code: { type: String,},
-    Sponsor_name: { type: String,},
+    Sponsor_code: { type: String, },
+    Sponsor_name: { type: String, },
     Date_of_joining: { type: String, default: () => moment().format("YYYY-MM-DD") },
     spackage: { type: String },
     package_value: { type: Number },
@@ -27,7 +27,7 @@ const MemberSchema = new mongoose.Schema(
     Nominee_name: { type: String },
     Nominee_age: { type: Number },
     Nominee_Relation: { type: String },
-    status: { type: String, enum: ["Pending", "active","Inactive"], default: "Pending" },
+    status: { type: String, enum: ["Pending", "active", "Inactive"], default: "Pending" },
     node: { type: String },
     transaction_pass: { type: String },
     bdb_value: { type: String },
@@ -39,36 +39,37 @@ const MemberSchema = new mongoose.Schema(
     member_code: { type: String },
     roi_status: { type: String },
     upgrade_package: { type: String },
-    upgrade_status: { type: String,
-      enum: [ "Pending", "Processing","Approved", "Completed", "Rejected"], 
+    upgrade_status: {
+      type: String,
+      enum: ["Pending", "Processing", "Approved", "Completed", "Rejected", "Repaid"],
       default: "Pending"
-     },
+    },
     level_eligible: { type: String },
     TBPDays: { type: String },
     level_income: { type: String },
     direct_income: { type: String },
-    account_number : { type: String },
-    ifsc_code : { type: String },
-    bank_name : { type: String },
-    profile_image : { type: String },
-    sponsor_id: { type: String, default: null }, 
-    direct_referrals: { type: [String], default: [] }, 
+    account_number: { type: String },
+    ifsc_code: { type: String },
+    bank_name: { type: String },
+    profile_image: { type: String },
+    sponsor_id: { type: String, default: null },
+    direct_referrals: { type: [String], default: [] },
     total_team: { type: Number, default: 0 },
     // KYC fields
     kycStatus: {
       type: String,
-      enum: ["PENDING","PROCESSING", "APPROVED", "REJECTED"],
+      enum: ["PENDING", "PROCESSING", "APPROVED", "REJECTED"],
       default: "PENDING"
     },
     // Cashfree beneficiary fields
     beneficiaryId: { type: String },
     beneficiaryStatus: {
       type: String,
-      enum: ["NOT_CREATED","FAILED" ,"CREATED"],
+      enum: ["NOT_CREATED", "FAILED", "CREATED"],
       default: "NOT_CREATED"
     }
   },
-  { timestamps: true, collection: "member_tbl" } 
+  { timestamps: true, collection: "member_tbl" }
 );
 
 const MemberModel = mongoose.model("member_tbl", MemberSchema);

@@ -130,9 +130,8 @@ const activateMemberPackage = async (req, res) => {
 
     // MLM activation only when status changes to active
     if (oldStatus !== "active" && updatedMember.status === "active") {
-      /* 
       try {
-        // Trigger MLM commissions
+        // Trigger MLM commissions (Referral Update Only)
         const mlmResult = await triggerMLMCommissions({
           body: {
             new_member_id: updatedMember.Member_id,
@@ -154,17 +153,10 @@ const activateMemberPackage = async (req, res) => {
         return res.status(200).json({
           success: true,
           data: updatedMember,
-          message: `${selectedPackage.name} package activated successfully (MLM process error)`,
+          message: `${selectedPackage.name} package activated successfully (Referral update error)`,
           mlm_error: mlmError.message
         });
       }
-      */
-      // Temporary response without MLM
-      return res.status(200).json({
-        success: true,
-        data: updatedMember,
-        message: `${selectedPackage.name} package activated successfully (Commissions Disabled)`
-      });
     }
 
     return res.status(200).json({
@@ -310,9 +302,8 @@ const updateMemberStatus = async (req, res) => {
 
     // If status changed to active (from any status) trigger MLM commissions
     if (oldStatus !== "active" && status === "active") {
-      /*
       try {
-        // Trigger MLM commissions
+        // Trigger MLM commissions (Referral Update Only)
         const mlmResult = await triggerMLMCommissions({
           body: {
             new_member_id: updatedMember.Member_id,
@@ -333,18 +324,11 @@ const updateMemberStatus = async (req, res) => {
         console.error("MLM Commission Error:", mlmError);
         return res.status(200).json({
           success: true,
-          message: "Member status updated to active (MLM process error)",
+          message: "Member status updated to active (Referral update error)",
           data: updatedMember,
           mlm_error: mlmError.message
         });
       }
-      */
-      // Temporary response without MLM
-      return res.status(200).json({
-        success: true,
-        message: "Member status updated to active (Commissions Disabled)",
-        data: updatedMember
-      });
     }
 
     return res.status(200).json({ success: true, message: "Member status updated", data: updatedMember });

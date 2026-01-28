@@ -12,14 +12,9 @@ const {
 
 const triggerMLMCommissions = async (req, res) => {
   try {
-    return res.status(200).json({
-      success: true,
-      message: "MLM Commissions are currently disabled"
-    });
-    /*
     const { new_member_id, Sponsor_code } = req.body;
 
-    console.log("🟢 Incoming Request Data:", { new_member_id, Sponsor_code });
+    console.log("🟢 Incoming Request Data (Referral Update Only):", { new_member_id, Sponsor_code });
 
     if (!new_member_id || !Sponsor_code) {
       return res.status(400).json({
@@ -57,10 +52,6 @@ const triggerMLMCommissions = async (req, res) => {
       });
     }
 
-    // console.log(
-    //   `🚀 Triggering MLM commissions - New Member: ${new_member_id}, Direct Sponsor: ${Sponsor_code} -> ${sponsor.Member_id} (${sponsor.Name})`
-    // );
-
     // Update member's sponsor details if needed
     if (newMember.sponsor_id !== sponsor.Member_id) {
       await MemberModel.findOneAndUpdate(
@@ -75,61 +66,21 @@ const triggerMLMCommissions = async (req, res) => {
     }
 
     // Update direct sponsor's referrals list
+    // THIS IS THE CRITICAL PART FOR HIERARCHY - ONLY THIS RUNS
     await updateSponsorReferrals(sponsor.Member_id, new_member_id);
     console.log("👥 Direct sponsor referrals updated");
 
-    const commissions = await calculateCommissions(new_member_id, sponsor.Member_id);
-    console.log("💰 Calculated Commissions:", JSON.stringify(commissions, null, 2));
-
-    if (commissions.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: "No eligible upline sponsors found for commission"
-      });
-    }
-
-    // Process all commissions (create payouts and transactions)
-    const results = await processCommissions(commissions);
-    console.log("📊 Commission Processing Results:", JSON.stringify(results, null, 2));
-
-    // Calculate summary statistics
-    const successfulCommissions = results.filter((r) => r.success);
-    const failedCommissions = results.filter((r) => !r.success);
-    const totalAmount = successfulCommissions.reduce((sum, comm) => sum + comm.amount, 0);
+    // COMMISSIONS SKIPPED
 
     return res.status(200).json({
       success: true,
-      message: `MLM commissions processed successfully`,
+      message: "Referral hierarchy updated successfully (Commissions Disabled)",
       data: {
-        new_member: {
-          id: new_member_id,
-          name: newMember.Name,
-          status: newMember.status
-        },
-        sponsor: {
-          id: sponsor.Member_id,
-          code: sponsor.Member_id,
-          name: sponsor.Name,
-          status: sponsor.status
-        },
-        commissions: {
-          total_levels: successfulCommissions.length,
-          total_commissions: commissions.length,
-          successful: successfulCommissions.length,
-          failed: failedCommissions.length,
-          total_amount: totalAmount,
-          breakdown: successfulCommissions.map((comm) => ({
-            level: comm.level,
-            sponsor_id: comm.sponsor_id,
-            amount: comm.amount,
-            payout_type: comm.payout_type,
-            benefit_type: comm.level === 1 ? "direct" : "indirect",
-          })),
-          failures: failedCommissions,
-        },
-      },
+        new_member: { id: new_member_id },
+        sponsor: { id: sponsor.Member_id }
+      }
     });
-    */
+
   } catch (error) {
     console.error("❌ Error triggering MLM commissions:", error);
     return res.status(500).json({
@@ -143,6 +94,21 @@ const triggerMLMCommissions = async (req, res) => {
 
 const getMemberCommissionSummary = async (req, res) => {
   try {
+    return res.json({
+      success: true,
+      data: {
+        member_id: req.params.member_id,
+        message: "Commission system is disabled",
+        total_earnings: 0,
+        level_breakdown: {},
+        level_payouts: {},
+        upline_tree: [],
+        commission_rates: {},
+        recent_payouts: [],
+        recent_level_benefits: []
+      }
+    });
+    /*
     const { member_id } = req.params;
 
     // Get all payouts and transactions for the member
@@ -233,6 +199,7 @@ const getMemberCommissionSummary = async (req, res) => {
           })),
       },
     });
+    */
   } catch (error) {
     console.error("Error getting commission summary:", error);
     return res.status(500).json({ success: false, error: "Server error" });
@@ -241,6 +208,12 @@ const getMemberCommissionSummary = async (req, res) => {
 
 const getDailyPayout = async (req, res) => {
   try {
+    return res.status(200).json({
+      success: true,
+      data: { daily_earnings: [] },
+      message: "Commission system disabled",
+    });
+    /*
     const userRole = req.user.role;
     const loggedInMemberId = req.user.member_id;
     const { member_id } = req.params;
@@ -322,6 +295,7 @@ const getDailyPayout = async (req, res) => {
       success: true,
       data: { daily_earnings: result },
     });
+    */
   } catch (error) {
     console.error("Error in getDailyPayout:", error);
     return res.status(500).json({
@@ -376,6 +350,22 @@ const climeRewardLoan = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "You already have an active or pending loan. Please clear it first.",
+      });
+    }
+
+    // ELIGIBILITY CHECK: Package Value must be >= 600 (Covers 600 and 1200 packages)
+    if (!member.package_value || member.package_value < 600) {
+      return res.status(400).json({
+        success: false,
+        message: "You need a package value of at least 600 to be eligible for a loan.",
+      });
+    }
+
+    // ELIGIBILITY CHECK: Must have at least 2 Direct Referrals
+    if (!member.direct_referrals || member.direct_referrals.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: "You need at least 2 direct referrals to be eligible for a loan.",
       });
     }
 

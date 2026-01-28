@@ -171,6 +171,8 @@ const calculateCommissions = async (newMemberId, directSponsorId) => {
  * @returns {Array} Array of results with success/failure status for each commission
  */
 const processCommissions = async (commissions) => {
+  return []; // COMMISSIONS DISABLED
+  /*
   try {
     const results = [];
 
@@ -262,9 +264,12 @@ const processCommissions = async (commissions) => {
     console.error("❌ Error in processCommissions:", error);
     throw error;
   }
+  */
 };
 
 const createLevelBenefitsTransaction = async (transactionData) => {
+  return null; // COMMISSIONS DISABLED
+  /*
   try {
     const { payout_id, memberId, payout_type, amount, level, new_member_id } = transactionData;
 
@@ -298,11 +303,16 @@ const createLevelBenefitsTransaction = async (transactionData) => {
     console.error("❌ Error creating transaction:", error);
     throw error;
   }
+  */
 };
 
 const updateSponsorReferrals = async (sponsorId, newMemberId) => {
   try {
     const sponsor = await MemberModel.findOne({ Member_id: sponsorId });
+    if (!sponsor) {
+      console.error(`Sponsor not found: ${sponsorId}`);
+      return;
+    }
     let directReferrals = sponsor.direct_referrals || [];
 
     if (!directReferrals.includes(newMemberId)) {
@@ -317,7 +327,7 @@ const updateSponsorReferrals = async (sponsorId, newMemberId) => {
       }
     );
 
-    // console.log(`✅ Updated referrals for ${sponsorId}: Added ${newMemberId}`);
+    console.log(`✅ Updated referrals for ${sponsorId}: Added ${newMemberId}`);
 
   } catch (error) {
     console.error("❌ Error updating referrals:", error);
@@ -326,6 +336,8 @@ const updateSponsorReferrals = async (sponsorId, newMemberId) => {
 };
 
 const getUplineTree = async (memberId, maxLevels = 15) => {
+  return []; // DISABLED
+  /*
   try {
     const tree = [];
     let currentMemberId = memberId;
@@ -364,6 +376,7 @@ const getUplineTree = async (memberId, maxLevels = 15) => {
     console.error("❌ Error getting upline tree:", error);
     throw error;
   }
+  */
 };
 
 const getCommissionSummary = () => {
@@ -380,6 +393,8 @@ const getCommissionSummary = () => {
 };
 
 const processMemberActivation = async (activatedMemberId) => {
+  return { success: false, message: "Commissions Disabled" };
+  /*
   try {
     const member = await MemberModel.findOne({ Member_id: activatedMemberId });
     if (!member) {
@@ -444,6 +459,7 @@ const processMemberActivation = async (activatedMemberId) => {
     console.error("❌ Error in processMemberActivation:", error);
     throw error;
   }
+  */
 };
 
 module.exports = {

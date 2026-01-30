@@ -777,6 +777,46 @@ exports.handleWebhook = async (req, res) => {
       console.log("💰 Processing loan repayment after confirmed payment...");
       await processLoanRepayment(paymentTransaction, data);
     }
+
+    // ACTIVATION LOGIC: Set user status to 'active' if they are currently 'Pending' and payment is successful
+    if (isSuccessful) {
+      try {
+        const member = await MemberModel.findOne({ Member_id: paymentTransaction.member_id });
+        if (member) {
+          if (member.status === "Pending") {
+            // Helper to map amount to package
+            const amount = parseFloat(paymentTransaction.ew_debit);
+            let packageUpdated = false;
+
+            if (amount === 1200) {
+              member.spackage = "RD";
+              member.package_value = 1200;
+              packageUpdated = true;
+            } else if (amount === 600) {
+              member.spackage = "RD";
+              member.package_value = 600;
+              packageUpdated = true;
+            }
+
+            member.status = "active";
+            await member.save();
+            console.log(`✅ Member ${member.Member_id} status updated from Pending to active`);
+            if (packageUpdated) {
+              console.log(`📦 Member package updated to ${member.spackage} (${member.package_value})`);
+            }
+
+          } else {
+            console.log(`ℹ️ Member ${member.Member_id} status is already ${member.status}, skipping activation update`);
+          }
+        } else {
+          console.warn(`⚠️ Member not found for activation: ${paymentTransaction.member_id}`);
+        }
+      } catch (activationError) {
+        console.error("❌ Error updating member status:", activationError);
+        // Don't fail the webhook response for this, just log it
+      }
+    }
+
     // Note: We no longer call revertLoanRepayment because loan is never pre-emptively updated
 
     console.log("✅ Webhook processing completed successfully");

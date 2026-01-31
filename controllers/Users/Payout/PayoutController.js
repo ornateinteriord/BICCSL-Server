@@ -10,6 +10,32 @@ const {
   getUplineTree
 } = require("../mlmService/mlmService");
 
+// Reusable function to update referral hierarchy when a member becomes active
+const updateReferralHierarchy = async (newMemberId, sponsorId) => {
+  try {
+    const newMember = await MemberModel.findOne({ Member_id: newMemberId });
+    if (!newMember) throw new Error(`Member not found: ${newMemberId}`);
+    if (newMember.status !== "active") throw new Error(`Member status must be active, current status: ${newMember.status}`);
+
+    const sponsor = await MemberModel.findOne({ Member_id: sponsorId });
+    if (!sponsor) throw new Error(`Sponsor not found with ID: ${sponsorId}`);
+
+    if (newMember.sponsor_id !== sponsor.Member_id) {
+      await MemberModel.findOneAndUpdate(
+        { Member_id: newMemberId },
+        { sponsor_id: sponsor.Member_id, Sponsor_code: sponsor.Member_id, Sponsor_name: sponsor.Name }
+      );
+    }
+
+    await updateSponsorReferrals(sponsor.Member_id, newMemberId);
+
+    return { success: true, new_member: { id: newMemberId }, sponsor: { id: sponsor.Member_id } };
+  } catch (error) {
+    console.error("❌ Error updating referral hierarchy:", error.message || error);
+    throw error;
+  }
+};
+
 const triggerMLMCommissions = async (req, res) => {
   try {
     const { new_member_id, Sponsor_code } = req.body;
@@ -716,6 +742,7 @@ const repaymentLoan = async (req, res) => {
 
 module.exports = {
   triggerMLMCommissions,
+  updateReferralHierarchy,
   getMemberCommissionSummary,
   getDailyPayout,
   climeRewardLoan,

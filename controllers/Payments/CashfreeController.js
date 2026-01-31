@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const TransactionModel = require("../../models/Transaction/Transaction");
 const MemberModel = require("../../models/Users/Member");
 const PaymentModel = require("../../models/Payments/Payment");
+const { updateReferralHierarchy } = require("../Users/Payout/PayoutController");
 
 // Cashfree API Base URLs
 const CASHFREE_BASE = process.env.NODE_ENV === "PROD"
@@ -803,6 +804,20 @@ exports.handleWebhook = async (req, res) => {
             console.log(`✅ Member ${member.Member_id} status updated from Pending to active`);
             if (packageUpdated) {
               console.log(`📦 Member package updated to ${member.spackage} (${member.package_value})`);
+            }
+
+            // Update referral hierarchy now that member is active
+            try {
+              const sponsorId = member.sponsor_id || member.Sponsor_code;
+              if (sponsorId) {
+                console.log(`🔁 Updating referral hierarchy for new active member ${member.Member_id} with sponsor ${sponsorId}`);
+                await updateReferralHierarchy(member.Member_id, sponsorId);
+                console.log(`✅ Referral hierarchy updated for member ${member.Member_id}`);
+              } else {
+                console.log(`⚠️ No sponsorId found for member ${member.Member_id}; skipping referral update`);
+              }
+            } catch (refErr) {
+              console.error(`❌ Error updating referral hierarchy for member ${member.Member_id}:`, refErr.message || refErr);
             }
 
           } else {

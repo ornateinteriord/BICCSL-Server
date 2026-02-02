@@ -3,7 +3,20 @@ const MemberModel = require("../../../models/Users/Member");
 // Submit KYC details
 exports.submitKYC = async (req, res) => {
   try {
-    const { ref_no, bankAccount, ifsc, pan, address,bankName } = req.body;
+    const {
+      ref_no,
+      bankAccount,
+      ifsc,
+      pan,
+      address,
+      bankName,
+      panImage,
+      aadhaarImage,
+      checkImage,
+      passbookImage,
+      rationCardImage,
+      profileImage
+    } = req.body;
 
     // Find the member by ref_no
     const member = await MemberModel.findOne({ Member_id: ref_no });
@@ -12,7 +25,26 @@ exports.submitKYC = async (req, res) => {
       return res.status(404).json({ message: "Member not found" });
     }
 
-    // Verify bank details with Cashfree before saving
+    // Validate that all required documents are provided
+    const missingDocuments = [];
+    if (!panImage) missingDocuments.push("PAN Image");
+    if (!aadhaarImage) missingDocuments.push("Aadhaar Image");
+    if (!checkImage) missingDocuments.push("Check Image");
+    if (!passbookImage) missingDocuments.push("Passbook Image");
+    if (!rationCardImage) missingDocuments.push("Ration Card Image");
+    if (!profileImage) missingDocuments.push("Profile Image");
+
+    if (missingDocuments.length > 0) {
+      return res.status(400).json({
+        message: `Missing required documents: ${missingDocuments.join(", ")}`
+      });
+    }
+
+    // ==================== CASHFREE BANK VERIFICATION ====================
+    // Note: Currently commented out - Admin will manually validate bank details
+    // Uncomment this section when Cashfree Payout is activated
+
+    /* 
     const axios = require("axios");
     
     try {
@@ -34,7 +66,7 @@ exports.submitKYC = async (req, res) => {
 
       // Extract token from response
       const bearerToken = authResponse.data?.data?.token || authResponse.data?.token;
-      
+
       if (!bearerToken) {
         console.error("Failed to extract token from auth response:", authResponse.data);
         throw new Error("Failed to get authorization token from Cashfree");
@@ -49,7 +81,7 @@ exports.submitKYC = async (req, res) => {
         bankAccount: bankAccount,
         ifsc: ifsc
       });
-      
+
       const validationResponse = await axios.get(
         "https://payout-gamma.cashfree.com/payout/v1/validation/bankDetails",
         {
@@ -70,29 +102,40 @@ exports.submitKYC = async (req, res) => {
 
       // Check if bank validation was successful
       if (validationResponse.data.status !== "SUCCESS") {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "Bank account verification failed",
           details: validationResponse.data.message || "Invalid bank details provided"
         });
       }
-      
+
       // Log successful validation
       console.log("Bank account verified successfully for member:", ref_no);
     } catch (validationError) {
       console.error("Bank validation error:", validationError.response?.data || validationError.message);
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: "Bank account verification failed",
         details: validationError.response?.data?.message || "Could not verify bank details with payment provider"
       });
     }
+    */
+
+    // ==================== END CASHFREE VERIFICATION ====================
 
     // Update member with KYC details
     member.account_number = bankAccount;
     member.ifsc_code = ifsc;
     member.Pan_no = pan;
-    member.bank_name=bankName;
+    member.bank_name = bankName;
     member.address = address;
     member.kycStatus = "PROCESSING";
+
+    // Update document URLs
+    member.panImage = panImage;
+    member.aadhaarImage = aadhaarImage;
+    member.checkImage = checkImage;
+    member.passbookImage = passbookImage;
+    member.rationCardImage = rationCardImage;
+    member.profile_image = profileImage;
 
     // Save the updated member
     await member.save();
@@ -152,7 +195,7 @@ exports.getKycSubmissions = async (req, res) => {
     const skip = (Math.max(parseInt(page, 10), 1) - 1) * parseInt(limit, 10);
 
     const submissions = await MemberModel.find(filter)
-      .select("Member_id Name mobileno email account_number ifsc_code bank_name Pan_no kycStatus beneficiaryStatus beneficiaryId address createdAt updatedAt")
+      .select("Member_id Name mobileno email account_number ifsc_code bank_name Pan_no kycStatus beneficiaryStatus beneficiaryId address panImage aadhaarImage checkImage passbookImage rationCardImage profile_image createdAt updatedAt")
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit, 10));
@@ -184,8 +227,8 @@ async function autoCreateBeneficiary(user) {
 
     // First, authenticate with Cashfree to get Bearer token
     const authResponse = await axios.post(
-     "https://payout-gamma.cashfree.com/payout/v1/authorize"
-,
+      "https://payout-gamma.cashfree.com/payout/v1/authorize"
+      ,
       {},
       {
         headers: {
@@ -193,14 +236,14 @@ async function autoCreateBeneficiary(user) {
           "x-client-secret": process.env.CI_SECRET_KEY,
           "Content-Type": "application/json",
         }
-        
+
       }
     );
     console.log("Cashfree Auth Responseqqqqq:", authResponse.data);
 
     // Extract token from response - handle both possible response structures
     const bearerToken = authResponse.data?.data?.token || authResponse.data?.token;
-    
+
     if (!bearerToken) {
       throw new Error(`Failed to extract authorization token from Cashfree. Response: ${JSON.stringify(authResponse.data)}`);
     }
@@ -222,7 +265,7 @@ async function autoCreateBeneficiary(user) {
     // Make API call to Cashfree with Bearer token
     const response = await axios.post(
       "https://payout-gamma.cashfree.com/payout/v1/addBeneficiary"
-,
+      ,
       payload,
       {
         headers: {

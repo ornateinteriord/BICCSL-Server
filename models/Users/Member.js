@@ -61,6 +61,12 @@ const MemberSchema = new mongoose.Schema(
       enum: ["PENDING", "PROCESSING", "APPROVED", "REJECTED"],
       default: "PENDING"
     },
+    // KYC Document URLs
+    panImage: { type: String },
+    aadhaarImage: { type: String },
+    checkImage: { type: String },
+    passbookImage: { type: String },
+    rationCardImage: { type: String },
     // Cashfree beneficiary fields
     beneficiaryId: { type: String },
     beneficiaryStatus: {

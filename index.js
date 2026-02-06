@@ -1,5 +1,7 @@
 // ====================== Imports ======================
 const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
 const cors = require("cors");
 require("dotenv").config()
 const ImageKit = require("imagekit");
@@ -11,12 +13,15 @@ const UserRoutes = require("./routes/UserRoutes");
 const AdminRoutes = require("./routes/AdminRoute");
 const PaymentRoutes = require("./routes/PaymentRoutes");
 const KYCRoutes = require("./routes/KYCRoutes");
+const ChatRoutes = require("./routes/ChatRoutes");
 
 // 🔐 CASHFREE WEBHOOK CONTROLLER
 const { handleWebhook } = require("./controllers/Payments/CashfreeController");
 const connectDB = require("./models/db");
+const initializeChatSocket = require("./sockets/chat.socket");
 
 const app = express();
+const server = http.createServer(app);
 
 app.use(async (req, res, next) => {
   try {
@@ -31,25 +36,34 @@ app.use(async (req, res, next) => {
   }
 });
 
-const startServer = async () => {
-  try {
-    await connectDB();
-    console.log("✅ MongoDB connected");
+// ======================================================
+//        🔌 SOCKET.IO SETUP
+// ======================================================
+const io = new Server(server, {
+  cors: {
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true); // Postman / server-to-server
 
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`🌍 Server running on port ${PORT}`);
-      console.log("🔔 Cashfree webhook ready");
-    });
-  } catch (error) {
-    console.error("❌ Server failed:", error.message);
-    process.exit(1);
+      const isLocalhost = /^http:\/\/localhost:\d+$/.test(origin);
+      const isNgrok = origin?.endsWith("ngrok-free.dev");
+      const allowedOrigins = [
+        process.env.FRONTEND_URL,
+        "https://mscs-beige.vercel.app",
+        "https://biccsl.vercel.app"
+      ].filter(Boolean);
+
+      if (isLocalhost || isNgrok || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`WebSocket CORS BLOCKED: ${origin}`));
+    },
+    credentials: true
   }
-};
+});
 
-// Start server only if NOT running in Vercel environment
-if (process.env.VERCEL !== "1") {
-  startServer();
-}
+// Initialize chat socket handlers
+initializeChatSocket(io);
 // ======================================================
 //        🛡️ CORS CONFIG (Supports Vite + ngrok)
 // ======================================================
@@ -133,6 +147,7 @@ app.use("/user", UserRoutes);
 app.use("/admin", AdminRoutes);
 app.use("/payments", PaymentRoutes);
 app.use("/kyc", KYCRoutes);
+app.use("/chat", ChatRoutes);
 
 // ======================================================
 //        🏠 HOME
@@ -145,6 +160,27 @@ app.get("/", (req, res) => {
 //        🚀 Start Server
 // ======================================================
 const PORT = process.env.PORT || 5051;
-app.listen(PORT, () => {
-  console.log(`🌍 Server running on port ${PORT}`);
-});
+
+const startServer = async () => {
+  try {
+    await connectDB();
+    console.log("✅ MongoDB connected");
+
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`🌍 Server running on port ${PORT}`);
+      console.log("🔔 Cashfree webhook ready");
+      console.log("💬 WebSocket server ready");
+    });
+  } catch (error) {
+    console.error("❌ Server failed:", error.message);
+    process.exit(1);
+  }
+};
+
+// Start server (Vercel handles this differently)
+if (process.env.VERCEL !== "1") {
+  startServer();
+} else {
+  // For Vercel, just export the app
+  module.exports = app;
+}

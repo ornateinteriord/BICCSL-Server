@@ -62,7 +62,13 @@ const getRooms = async (req, res) => {
 };
 
 // Get messages for a specific room (with pagination)
+// TEMPORARILY DISABLED - Will be re-enabled later
 const getMessages = async (req, res) => {
+    return res.status(503).json({
+        success: false,
+        message: "Chat messages feature is temporarily disabled",
+    });
+    /*
     try {
         const { roomId } = req.params;
         const userId = req.user.Member_id || req.user.memberId || req.user.id;
@@ -111,6 +117,7 @@ const getMessages = async (req, res) => {
             error: error.message,
         });
     }
+    */
 };
 
 // Create or get existing chat room between two users
@@ -347,7 +354,13 @@ const searchMember = async (req, res) => {
 };
 
 // Send a message via REST API (alternative to WebSocket for Vercel deployment)
+// TEMPORARILY DISABLED - Will be re-enabled later
 const sendMessage = async (req, res) => {
+    return res.status(503).json({
+        success: false,
+        message: "Chat send message feature is temporarily disabled",
+    });
+    /*
     try {
         const { roomId, text } = req.body;
         let userId = req.user.Member_id || req.user.memberId || req.user.id;
@@ -489,6 +502,7 @@ const sendMessage = async (req, res) => {
             error: error.message,
         });
     }
+    */
 };
 
 // Get or create support chat with admin (auto-connect for users)

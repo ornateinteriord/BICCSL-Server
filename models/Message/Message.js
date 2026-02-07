@@ -8,8 +8,10 @@ const MessageSchema = new mongoose.Schema(
         senderRole: { type: String, enum: ["USER", "ADMIN"], default: "USER" },
         recipientId: { type: String, required: true, index: true },
         messageType: { type: String, enum: ["text", "image", "file"], default: "text" },
-        text: { type: String, required: true },
-        imageUrl: { type: String },
+        text: { type: String, default: "" },
+        imageUrl: { type: String, default: "" },
+        fileName: { type: String, default: "" },
+        fileSize: { type: Number, default: 0 },
         isRead: { type: Boolean, default: false },
     },
     { timestamps: true, collection: "messages" }

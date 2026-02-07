@@ -62,13 +62,7 @@ const getRooms = async (req, res) => {
 };
 
 // Get messages for a specific room (with pagination)
-// TEMPORARILY DISABLED - Will be re-enabled later
 const getMessages = async (req, res) => {
-    return res.status(503).json({
-        success: false,
-        message: "Chat messages feature is temporarily disabled",
-    });
-    /*
     try {
         const { roomId } = req.params;
         const userId = req.user.Member_id || req.user.memberId || req.user.id;
@@ -117,7 +111,6 @@ const getMessages = async (req, res) => {
             error: error.message,
         });
     }
-    */
 };
 
 // Create or get existing chat room between two users
@@ -353,23 +346,19 @@ const searchMember = async (req, res) => {
     }
 };
 
-// Send a message via REST API (alternative to WebSocket for Vercel deployment)
-// TEMPORARILY DISABLED - Will be re-enabled later
+// Send a message via REST API (text only - image/file support commented out)
 const sendMessage = async (req, res) => {
-    return res.status(503).json({
-        success: false,
-        message: "Chat send message feature is temporarily disabled",
-    });
-    /*
     try {
-        const { roomId, text } = req.body;
+        // Image/file fields commented out - only text messages supported
+        const { roomId, text /*, imageUrl, messageType, fileName, fileSize */ } = req.body;
         let userId = req.user.Member_id || req.user.memberId || req.user.id;
         const userRole = req.user.role;
 
         console.log("sendMessage - req.user:", req.user);
         console.log("sendMessage - initial userId:", userId, "role:", userRole);
 
-        if (!roomId || !text || !text.trim()) {
+        // Validate: must have text only (image/file support commented out)
+        if (!roomId || !text?.trim()) {
             return res.status(400).json({
                 success: false,
                 message: "Room ID and message text are required",
@@ -429,6 +418,9 @@ const sendMessage = async (req, res) => {
         // Find the chat room
         let chatRoom = await ChatRoomModel.findOne({ roomId });
 
+        // Determine the display text for lastMessage (image/file display commented out)
+        const displayText = text?.trim() || ''; // Removed: || (messageType === 'image' ? '📷 Image' : '📎 File')
+
         if (!chatRoom) {
             // Extract participant IDs from roomId (format: userId1_userId2)
             const participants = roomId.split("_");
@@ -449,12 +441,12 @@ const sendMessage = async (req, res) => {
                 roomId,
                 participants,
                 participantDetails,
-                lastMessage: text.substring(0, 100),
+                lastMessage: displayText.substring(0, 100),
                 lastMessageTime: new Date(),
                 unreadCount: new Map(),
             });
         } else {
-            chatRoom.lastMessage = text.substring(0, 100);
+            chatRoom.lastMessage = displayText.substring(0, 100);
             chatRoom.lastMessageTime = new Date();
         }
 
@@ -467,14 +459,19 @@ const sendMessage = async (req, res) => {
 
         await chatRoom.save();
 
-        // Create message
+        // Create message - text only (image/file fields commented out)
         const message = new MessageModel({
             roomId,
             senderId: senderId,
             senderName: senderName,
             senderRole: senderRole,
             recipientId: recipient || "",
-            text: text.trim(),
+            messageType: "text", // Fixed to text only, was: messageType || "text"
+            text: text?.trim() || "",
+            // Image/file fields commented out
+            // imageUrl: imageUrl || "",
+            // fileName: fileName || "",
+            // fileSize: fileSize || 0,
             isRead: false,
         });
 
@@ -488,7 +485,11 @@ const sendMessage = async (req, res) => {
                 senderId: message.senderId,
                 senderName: message.senderName,
                 senderRole: message.senderRole,
+                messageType: message.messageType,
                 text: message.text,
+                imageUrl: message.imageUrl,
+                fileName: message.fileName,
+                fileSize: message.fileSize,
                 isRead: message.isRead,
                 createdAt: message.createdAt,
             },
@@ -502,7 +503,6 @@ const sendMessage = async (req, res) => {
             error: error.message,
         });
     }
-    */
 };
 
 // Get or create support chat with admin (auto-connect for users)
